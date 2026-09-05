@@ -1,0 +1,29 @@
+workspace = "boringcache/benchmarks"
+
+[proxy]
+metadata-hints = ["project=waterui"]
+
+[entries.cargo-target]
+kind = "cargo-target"
+tag = "waterui-linux-tests-rolling-20260905-target"
+path = "target"
+
+[entries.cargo-registry]
+tag = "waterui-linux-tests-rolling-20260905-registry"
+
+[entries.cargo-git]
+tag = "waterui-linux-tests-rolling-20260905-git"
+
+[profiles.cargo]
+entries = ["cargo-target", "cargo-registry", "cargo-git"]
+
+[adapters.sccache]
+tag = "waterui-linux-tests-rolling-20260905-compiler"
+
+[adapters.cargo]
+tag = "waterui-linux-tests-rolling-20260905"
+profiles = ["cargo"]
+compiler-cache = "sccache"
+command = ["cargo", "nextest", "run", "--workspace", "--profile", "ci"]
+fail-on-cache-error = true
+metadata-hints = ["tool=sccache", "lane=linux-tests"]
