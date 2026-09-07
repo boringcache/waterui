@@ -2,6 +2,9 @@
 target
 /test-artifacts/
 /lcov.info
+# Downloaded by the native Windows shader-compiler setup.
+/dxc/
+/dxc.zip
 .water
 apple/DerivedData
 apple/build
