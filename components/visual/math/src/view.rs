@@ -10,7 +10,7 @@ use peniko::{Brush, Color as PenikoColor, FontData};
 use waterui_core::layout::Size;
 use waterui_core::{Computed, Environment, Signal, View};
 use waterui_graphics::color::{Color, ForegroundColor, ResolvedColor};
-use waterui_graphics::{Scene2D, SceneContent, SceneInvalidator, SceneView};
+use waterui_graphics::{Scene2D, SceneContent, SceneInvalidator, SceneView, invalidate_on_change};
 use waterui_layout::frame::Frame;
 use waterui_str::Str;
 
@@ -158,7 +158,7 @@ pub fn prepare(
         .map_err(|error| MathError::Layout(crate::layout::LayoutError::Font(error)))?;
     let layouter = Layouter::new(&math_font)?;
     let layout = layouter.layout(&item, font_size, style)?;
-    let mathml = mathml::to_mathml(&item, style).unwrap_or_else(|_| String::new());
+    let mathml = mathml::to_mathml(&item, style);
 
     Ok(PreparedMath {
         item,
@@ -362,16 +362,27 @@ impl SceneContent for MathContent {
         Some(size)
     }
 
+    /// The formula as `MathML`, which is what a screen reader reads.
+    ///
+    /// A formula reaches the screen as filled paths and glyph runs — to
+    /// assistive technology that is a picture with no content — so this node is
+    /// the only place the formula can be said at all. It is read fresh on every
+    /// emission, and the source watcher installed by [`Self::set_invalidator`]
+    /// is what schedules the frame that re-emits it, so a formula bound to
+    /// state stays current without its subtree being rebuilt.
+    fn accessibility_label(&self) -> Option<String> {
+        Some(accessibility_markup(&self.source.get(), self.style))
+    }
+
     fn set_invalidator(&mut self, invalidator: Option<SceneInvalidator>) {
         // A formula is typeset from the source read in `build_scene`, so a
         // surface that is never told the source changed keeps presenting the
         // box it typeset last. Watching the signal schedules the frame that
         // re-typesets it; this is scene invalidation, not a subtree rebuild,
         // so the content instance and its resolved font survive the change.
-        self.source_guard = invalidator.as_ref().map(|invalidator| {
-            let invalidator = SceneInvalidator::clone(invalidator);
-            self.source.watch(move |_| invalidator())
-        });
+        self.source_guard = invalidator
+            .as_ref()
+            .map(|invalidator| invalidate_on_change(invalidator, &self.source));
         self.invalidator = invalidator;
     }
 }
@@ -394,7 +405,34 @@ impl View for Math {
 
         let content = MathContent::new(self.source, self.font_size, self.style, self.family, brush);
 
+        // The formula's accessibility node is the leaf's own: `MathContent`
+        // answers `SceneContent::accessibility_label` with the markup, which
+        // the backend offers as the node's name when the application named
+        // nothing itself. It cannot be attached here as `.a11y_label(…)`
+        // metadata — that is nearest-consumer and would beat the application's
+        // own label instead of yielding to it.
         Frame::new(SceneView::new(content))
+    }
+}
+
+/// The formula's accessibility payload: its `MathML`.
+///
+/// A source that does not parse has no semantic tree and therefore no markup,
+/// and it does not draw either — so the only content that exists is the LaTeX
+/// the author wrote, and that is what the node says. The parse failure is
+/// reported: a formula that silently reads as its own source is a formula that
+/// silently did not render.
+fn accessibility_markup(source: &Str, style: MathStyle) -> String {
+    match latex::parse(source.as_str()) {
+        Ok(item) => mathml::to_mathml(&item, style),
+        Err(error) => {
+            tracing::error!(
+                %error,
+                formula = %source,
+                "formula does not parse; its source is all the accessibility node can say"
+            );
+            String::from(source.as_str())
+        }
     }
 }
 
@@ -427,8 +465,9 @@ mod tests {
     use waterui_graphics::{SceneContent, SceneInvalidator};
     use waterui_str::Str;
 
-    use super::{DEFAULT_MATH_FAMILY, MathContent};
+    use super::{DEFAULT_MATH_FAMILY, MathContent, accessibility_markup};
     use crate::ast::MathStyle;
+    use crate::{latex, mathml};
 
     /// A [`SceneInvalidator`] that counts the frames it was asked for.
     fn counting_invalidator() -> (SceneInvalidator, Rc<Cell<usize>>) {
@@ -446,6 +485,42 @@ mod tests {
             DEFAULT_MATH_FAMILY,
             Brush::Solid(PenikoColor::BLACK),
         )
+    }
+
+    /// The accessibility payload is the converter's markup, never a blank.
+    ///
+    /// It used to be: the conversion's `Result` was discarded into an empty
+    /// string, so a node that was supposed to carry the formula carried
+    /// nothing at all. The converter is total now, and this pins that the view
+    /// publishes exactly what it produces.
+    #[test]
+    fn the_accessibility_payload_is_the_converters_markup() {
+        let source = Str::from_static(r"\frac{a}{b}");
+        let expected = mathml::to_mathml(
+            &latex::parse(source.as_str()).expect("the fixture formula parses"),
+            MathStyle::Text,
+        );
+
+        assert!(!expected.is_empty(), "a parsed formula always has markup");
+        assert_eq!(accessibility_markup(&source, MathStyle::Text), expected);
+    }
+
+    /// A source that does not parse has no tree and therefore no markup, and it
+    /// does not draw either. The one thing that does exist is what the author
+    /// wrote, so that is what the node says — never an empty payload.
+    #[test]
+    fn a_source_that_does_not_parse_still_says_something() {
+        let source = Str::from_static(r"\begin{matrix}a & b\\c & d\end{matrix}");
+        assert!(
+            latex::parse(source.as_str()).is_err(),
+            "this fixture exists to be refused by the parser"
+        );
+
+        assert_eq!(
+            accessibility_markup(&source, MathStyle::Text),
+            source.as_str(),
+            "the node must carry the source when there is no markup to carry"
+        );
     }
 
     #[test]

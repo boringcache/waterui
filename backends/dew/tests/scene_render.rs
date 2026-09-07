@@ -28,13 +28,14 @@ use waterui_core::AnyView;
 use waterui_core::layout::{Point, Rect as LayoutRect, Size};
 use waterui_dew::{ClipRegion, DewRuntime, DisplayList, DrawCommand, HostBoard, render_view_png};
 use waterui_graphics::color::Srgb;
-use waterui_graphics::{Scene2D, SceneContent, SceneInvalidator, SceneView};
+use waterui_graphics::{Scene2D, SceneContent, SceneInvalidator, SceneView, invalidate_on_change};
 use waterui_layout::scroll::ScrollView;
+use waterui_math::ast::MathStyle;
+use waterui_math::view::Math;
+use waterui_math::{latex, mathml};
 use waterui_svg::Svg;
 
 mod support;
-
-const EXPORT_DIR: &str = "/tmp/waterui_dew_scene2d";
 
 /// A small document exercising fills, strokes and a group opacity — the three
 /// things an SVG asks of a scene, and the third of which needs a real
@@ -69,8 +70,7 @@ fn only_scene(list: &DisplayList) -> (&DrawCommand, Rect) {
 }
 
 fn export(name: &str, png: &[u8]) {
-    std::fs::create_dir_all(EXPORT_DIR).expect("create the scene export directory");
-    std::fs::write(format!("{EXPORT_DIR}/{name}.png"), png).expect("write the review PNG");
+    std::fs::write(support::export_path("scene2d", name), png).expect("write the review PNG");
 }
 
 /// A box covering the canvas' own coordinate space.
@@ -134,6 +134,51 @@ fn a_scene_publishes_an_accessibility_node() {
             .iter()
             .any(|(_, node)| node.role() == Role::Image),
         "a scene view is published as an image node"
+    );
+}
+
+/// Scene content that knows what it drew names its own node.
+///
+/// A formula reaches the panel as anonymous filled paths, so this node is the
+/// only place its content can be announced at all. Dew published it unnamed:
+/// the tree said "image" and nothing else. The content's own
+/// `SceneContent::accessibility_label` — the formula's `MathML` — is what names
+/// it, the same answer hydrolysis offers for the same drawing, so a formula is
+/// readable on both self-drawn backends rather than on whichever one the test
+/// happened to run.
+#[test]
+fn scene_content_names_its_own_accessibility_node() {
+    const FORMULA: &str = r"\frac{a}{b}";
+
+    let mut runtime = DewRuntime::new(
+        HostBoard::new(160, 160),
+        support::test_environment(),
+        16,
+        || AnyView::new(Math::new(FORMULA)),
+    );
+    runtime.pump().expect("the first frame renders");
+
+    // The expectation comes from the same public converter the view publishes
+    // through, so it tracks the converter instead of rotting into a stale
+    // literal.
+    let expected = mathml::to_mathml(
+        &latex::parse(FORMULA).expect("the fixture formula parses"),
+        MathStyle::Text,
+    );
+
+    let update = runtime
+        .board()
+        .accessibility_tree()
+        .expect("dew publishes an accessibility tree");
+    let labels: Vec<Option<&str>> = update
+        .nodes
+        .iter()
+        .filter(|(_, node)| node.role() == Role::Image)
+        .map(|(_, node)| node.label())
+        .collect();
+    assert!(
+        labels.contains(&Some(expected.as_str())),
+        "the formula's image node must carry its MathML, got {labels:?}"
     );
 }
 
@@ -219,7 +264,7 @@ impl SceneContent for CountingContent {
     }
 
     fn set_invalidator(&mut self, invalidator: Option<SceneInvalidator>) {
-        self.guard = invalidator.map(|invalidator| self.fill.watch(move |_| invalidator()));
+        self.guard = invalidator.map(|invalidator| invalidate_on_change(&invalidator, &self.fill));
     }
 }
 

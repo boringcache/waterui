@@ -1832,15 +1832,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codepage-437"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e40c1169585d8d08e5675a39f2fc056cd19a258fc4cba5e3bbf4a9c1026de535"
-dependencies = [
- "csv",
-]
-
-[[package]]
 name = "codespan-reporting"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2387,27 +2378,6 @@ checksum = "13b588ba4ac1a99f7f2964d24b3d896ddc6bf847ee3855dbd4366f058cfcd331"
 dependencies = [
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "csv"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52cd9d68cf7efc6ddfaaee42e7288d3a99d613d4b50f76ce9827ae0c6e14f938"
-dependencies = [
- "csv-core",
- "itoa",
- "ryu",
- "serde_core",
-]
-
-[[package]]
-name = "csv-core"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "704a3c26996a80471189265814dbc2c257598b96b8a7feae2d31ace646bb9782"
-dependencies = [
- "memchr",
 ]
 
 [[package]]
@@ -4390,8 +4360,7 @@ dependencies = [
 [[package]]
 name = "glifo"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "282a26c1e23de04bdab3e34a21b6f877a479b96737792516b9b8b8f69b6661be"
+source = "git+https://github.com/lexoliu/vello?rev=d68d9e9825bcd1ffee762323881c13a2e7a3f639#d68d9e9825bcd1ffee762323881c13a2e7a3f639"
 dependencies = [
  "bytemuck",
  "foldhash 0.2.0",
@@ -9565,33 +9534,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rxing"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6609a7ccb6435312dd3a2bff9924cdbb1c96050510fff30676c3d7b8b0045739"
-dependencies = [
- "chrono",
- "codepage-437",
- "encoding_rs",
- "num",
- "once_cell",
- "regex",
- "rxing-one-d-proc-derive",
- "thiserror 2.0.20",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "rxing-one-d-proc-derive"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ee3a551320da932c705835119f5f9a69a144966d18780d35e3b394585c22ce3"
-dependencies = [
- "quote",
- "syn 3.0.3",
-]
-
-[[package]]
 name = "ryu"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11353,7 +11295,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "214ca0b2191785cbc06209b9ca1861e048e39b5ba33574b3cedd58363d5bb5f6"
 
 [[package]]
-name = "typography_rtl"
+name = "typography-rtl-example"
 version = "0.1.0"
 dependencies = [
  "hydrolysis-m3",
@@ -11747,8 +11689,7 @@ dependencies = [
 [[package]]
 name = "vello_common"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbb2141a2bca6e6d598e471fd4d1d7eed8e020aad6a28187edda07f091a325dd"
+source = "git+https://github.com/lexoliu/vello?rev=d68d9e9825bcd1ffee762323881c13a2e7a3f639#d68d9e9825bcd1ffee762323881c13a2e7a3f639"
 dependencies = [
  "bytemuck",
  "fearless_simd",
@@ -11787,8 +11728,7 @@ dependencies = [
 [[package]]
 name = "vello_hybrid"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dccbb4221070e7ef92486abef0002a651702f00a52d6be532249a0fa0eb3e9ba"
+source = "git+https://github.com/lexoliu/vello?rev=d68d9e9825bcd1ffee762323881c13a2e7a3f639#d68d9e9825bcd1ffee762323881c13a2e7a3f639"
 dependencies = [
  "bytemuck",
  "glifo 0.3.0",
@@ -11815,8 +11755,7 @@ dependencies = [
 [[package]]
 name = "vello_sparse_shaders"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86e5fd6b8d73d641ffe8522f05e2d5a7f23620005dfc1a7f49488790b9970267"
+source = "git+https://github.com/lexoliu/vello?rev=d68d9e9825bcd1ffee762323881c13a2e7a3f639#d68d9e9825bcd1ffee762323881c13a2e7a3f639"
 dependencies = [
  "wesl",
  "wesl-macros",
@@ -11980,6 +11919,34 @@ name = "waterkit-audio"
 version = "0.1.1"
 dependencies = [
  "async-channel",
+ "futures",
+ "jni 0.22.4",
+ "js-sys",
+ "mpris-server",
+ "ndk-context",
+ "num-traits",
+ "smallvec",
+ "smol",
+ "swift-bridge",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tracing",
+ "url",
+ "wasm-bindgen",
+ "waterkit-build 0.1.1",
+ "web-sys",
+ "windows 0.62.2",
+ "zbus",
+ "zenwave",
+]
+
+[[package]]
+name = "waterkit-audio"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40e5732d470edd325b4ff9d77e74b36bcb87cac5262e836360c272ad755c645c"
+dependencies = [
+ "async-channel",
  "cpal 0.18.2",
  "futures",
  "jni 0.22.4",
@@ -12002,7 +11969,7 @@ dependencies = [
  "tracing",
  "url",
  "wasm-bindgen",
- "waterkit-build",
+ "waterkit-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "web-sys",
  "windows 0.62.2",
  "zbus",
@@ -12012,6 +11979,18 @@ dependencies = [
 [[package]]
 name = "waterkit-build"
 version = "0.1.1"
+dependencies = [
+ "jni 0.22.4",
+ "ndk-context",
+ "swift-bridge-build",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "waterkit-build"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25017e351ff431968b04efc3dcf4be0e22755434933bed3f0100151628119148"
 dependencies = [
  "jni 0.22.4",
  "ndk-context",
@@ -12033,7 +12012,7 @@ dependencies = [
  "objc",
  "swift-bridge",
  "thiserror 2.0.20",
- "waterkit-build",
+ "waterkit-build 0.1.1",
  "waterkit-core",
  "wgpu",
 ]
@@ -12066,7 +12045,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tracing",
  "wasm-bindgen-futures",
- "waterkit-build",
+ "waterkit-build 0.1.1",
  "web-sys",
 ]
 
@@ -12097,8 +12076,45 @@ dependencies = [
  "swift-bridge",
  "thiserror 2.0.20",
  "tracing",
- "waterkit-build",
- "waterkit-video-core",
+ "waterkit-build 0.1.1",
+ "waterkit-video-core 0.1.1",
+ "wgpu",
+ "wgpu-hal",
+ "windows 0.62.2",
+ "yuv",
+]
+
+[[package]]
+name = "waterkit-codec"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0facca64891f545e0e7923d07765343a6481bbcac9e7072c797f54da243bd02"
+dependencies = [
+ "avif-parse",
+ "cros-codecs",
+ "half",
+ "image",
+ "jni 0.22.4",
+ "libc",
+ "moxcms",
+ "ndk",
+ "ndk-sys",
+ "objc2 0.6.4",
+ "objc2-core-foundation",
+ "objc2-core-media",
+ "objc2-core-video",
+ "objc2-foundation 0.3.2",
+ "objc2-io-surface",
+ "objc2-metal 0.3.2",
+ "objc2-video-toolbox",
+ "rav1d",
+ "rav1e",
+ "shaderloom",
+ "swift-bridge",
+ "thiserror 2.0.20",
+ "tracing",
+ "waterkit-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "waterkit-video-core 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "wgpu",
  "wgpu-hal",
  "windows 0.62.2",
@@ -12127,8 +12143,8 @@ dependencies = [
  "roxmltree 0.21.1",
  "swift-bridge",
  "thiserror 2.0.20",
- "waterkit-build",
- "waterkit-fs",
+ "waterkit-build 0.1.1",
+ "waterkit-fs 0.1.1",
 ]
 
 [[package]]
@@ -12144,7 +12160,28 @@ dependencies = [
  "swift-bridge",
  "thiserror 2.0.20",
  "tracing",
- "waterkit-build",
+ "waterkit-build 0.1.1",
+ "windows 0.62.2",
+]
+
+[[package]]
+name = "waterkit-fs"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e685725a5fbdaf59c29abe5cbe756f77d817c29fa0513741cc403801efbdfb3"
+dependencies = [
+ "async-fs",
+ "dirs",
+ "indexed_db_futures",
+ "jni 0.22.4",
+ "js-sys",
+ "serde",
+ "serde_json",
+ "swift-bridge",
+ "thiserror 2.0.20",
+ "tracing",
+ "wasm-bindgen",
+ "waterkit-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "windows 0.62.2",
 ]
 
@@ -12157,7 +12194,7 @@ dependencies = [
  "ndk-context",
  "swift-bridge",
  "thiserror 2.0.20",
- "waterkit-build",
+ "waterkit-build 0.1.1",
  "waterkit-core",
  "windows 0.62.2",
  "zbus",
@@ -12176,7 +12213,7 @@ dependencies = [
  "swift-bridge",
  "thiserror 2.0.20",
  "wasm-bindgen",
- "waterkit-build",
+ "waterkit-build 0.1.1",
  "waterkit-core",
  "waterkit-permission",
  "web-sys",
@@ -12196,7 +12233,7 @@ dependencies = [
  "swift-bridge",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "waterkit-build",
+ "waterkit-build 0.1.1",
  "waterkit-core",
  "web-sys",
  "windows 0.62.2",
@@ -12219,7 +12256,7 @@ dependencies = [
  "swift-bridge",
  "thiserror 2.0.20",
  "tracing",
- "waterkit-build",
+ "waterkit-build 0.1.1",
  "waterkit-core",
  "wayland-sys",
  "wgpu",
@@ -12229,9 +12266,11 @@ dependencies = [
 [[package]]
 name = "waterkit-video"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "723d22d14ef79d4b295bc3390b46d3297a6e745e682f0d5b9f2e12c1390da215"
 dependencies = [
  "waterkit-video-container",
- "waterkit-video-core",
+ "waterkit-video-core 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "waterkit-video-player",
  "waterkit-video-streaming",
 ]
@@ -12239,6 +12278,8 @@ dependencies = [
 [[package]]
 name = "waterkit-video-container"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b7a1176add3bc985a7a725b5bcdfc7586656840e3f0baa923f093978ea3ad01"
 dependencies = [
  "broadcast-common",
  "byteorder",
@@ -12247,7 +12288,7 @@ dependencies = [
  "quick-xml",
  "subtp",
  "transmux",
- "waterkit-video-core",
+ "waterkit-video-core 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -12258,8 +12299,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "waterkit-video-core"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ed5f6e7d28fa80b5587a00d6334381b9fc27001e5ed90f0472ed9ac48b5e83b"
+dependencies = [
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "waterkit-video-player"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0e8de1f5af68158ad79bc861ec3573096e8ec379ecfbe6e5a8d8a965b84c576"
 dependencies = [
  "aes",
  "async-channel",
@@ -12271,17 +12323,19 @@ dependencies = [
  "num-traits",
  "swift-bridge",
  "tracing",
- "waterkit-audio",
- "waterkit-build",
- "waterkit-codec",
+ "waterkit-audio 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "waterkit-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "waterkit-codec 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "waterkit-video-container",
- "waterkit-video-core",
+ "waterkit-video-core 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "waterkit-video-streaming",
 ]
 
 [[package]]
 name = "waterkit-video-streaming"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45bebec4d54696e030f30cb43afeeaa56775195adb0837cbc7b3f21d8388e447"
 dependencies = [
  "async-fs",
  "base64 0.22.1",
@@ -12295,7 +12349,7 @@ dependencies = [
  "quick-m3u8",
  "url",
  "uuid",
- "waterkit-video-core",
+ "waterkit-video-core 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "windows 0.62.2",
  "zenwave",
 ]
@@ -12375,19 +12429,17 @@ dependencies = [
 [[package]]
 name = "waterui-barcode"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a11ee95de03c52f0b6f681f30e471a398f3dd88053d19dc886a894bb7351078"
 dependencies = [
  "barcoders",
  "bytemuck",
  "fast_qr",
  "nami",
- "pollster 1.0.1",
- "rxing",
  "shaderloom",
  "thiserror 2.0.20",
- "waterui",
  "waterui-core",
  "waterui-graphics",
- "waterui-testing",
  "wgpu",
 ]
 
@@ -12631,6 +12683,7 @@ dependencies = [
  "waterui-core",
  "waterui-graphics",
  "waterui-layout",
+ "waterui-math",
  "waterui-navigation",
  "waterui-shape",
  "waterui-svg",
@@ -12665,6 +12718,7 @@ dependencies = [
  "objc2 0.6.4",
  "objc2-metal 0.3.2",
  "pastey 0.2.3",
+ "peniko",
  "pollster 1.0.1",
  "raw-window-handle",
  "tracing",
@@ -12672,7 +12726,7 @@ dependencies = [
  "tracing-oslog",
  "tracing-panic",
  "tracing-subscriber",
- "waterkit-audio",
+ "waterkit-audio 0.1.1",
  "waterui",
  "waterui-browser-cef",
  "waterui-chromium",
@@ -12750,6 +12804,7 @@ dependencies = [
  "tracing",
  "vello",
  "vello_common 0.2.0",
+ "vello_cpu",
  "vello_hybrid",
  "waterui",
  "waterui-core",
@@ -12872,18 +12927,18 @@ dependencies = [
 [[package]]
 name = "waterui-image"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40070b63d4842f6246bf178a1ae9383e5babd801b7f36c741bc990aa36663e49"
 dependencies = [
  "image",
  "mp4-atom",
  "num-traits",
  "shaderloom",
  "tracing",
- "waterkit-codec",
- "waterui",
+ "waterkit-codec 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "waterui-core",
  "waterui-graphics",
  "waterui-layout",
- "waterui-testing",
  "wgpu",
 ]
 
@@ -13036,6 +13091,8 @@ dependencies = [
 [[package]]
 name = "waterui-map-gpu"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00fce135f300c13b17ef8e9b46b771c0b6e4afb90d72931a3c945b08f0135a3d"
 dependencies = [
  "blocking",
  "bytemuck",
@@ -13052,10 +13109,8 @@ dependencies = [
  "mvt-reader",
  "nami",
  "native-executor",
- "num-traits",
  "parley",
  "peniko",
- "pollster 1.0.1",
  "rayon",
  "serde",
  "serde_json",
@@ -13088,10 +13143,12 @@ dependencies = [
  "toml 1.1.4+spec-1.1.0",
  "tracing",
  "ttf-parser",
+ "waterui",
  "waterui-core",
  "waterui-graphics",
  "waterui-layout",
  "waterui-str",
+ "waterui-testing",
  "wgpu",
 ]
 
@@ -13106,7 +13163,7 @@ dependencies = [
  "hydrolysis-m3",
  "image",
  "tracing",
- "waterkit-codec",
+ "waterkit-codec 0.1.1",
  "waterkit-dialog",
  "waterui",
  "waterui-controls",
@@ -13165,17 +13222,16 @@ dependencies = [
 [[package]]
 name = "waterui-particle"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b0dc9f966aff7111215789e46af1ad4990f1e997c371c0a242ac08effe9d8ea"
 dependencies = [
  "bytemuck",
  "encase",
  "fastrand",
  "num-traits",
- "pollster 1.0.1",
  "shaderloom",
- "waterui",
  "waterui-core",
  "waterui-graphics",
- "waterui-testing",
  "wgpu",
 ]
 
@@ -13335,29 +13391,27 @@ dependencies = [
 [[package]]
 name = "waterui-video-gpu"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f1e26e10d48b44eb903ff03f1b574c9e9db7cfb468bb58205c091e56722fd7b"
 dependencies = [
  "async-channel",
  "executor-core",
  "futures",
  "futures-timer",
- "hydrolysis-m3",
  "jni 0.22.4",
  "nami",
  "num-traits",
- "pollster 1.0.1",
  "shaderloom",
  "tracing",
  "uuid",
- "waterkit-audio",
- "waterkit-codec",
- "waterkit-fs",
+ "waterkit-audio 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "waterkit-codec 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "waterkit-fs 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "waterkit-video",
- "waterui",
  "waterui-controls",
  "waterui-core",
  "waterui-graphics",
  "waterui-layout",
- "waterui-testing",
  "waterui-text",
  "waterui-video",
  "wgpu",
@@ -13366,6 +13420,8 @@ dependencies = [
 [[package]]
 name = "waterui-visualizer"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aa089c33f0cab1a5fa3868369e07878d916a789c86d94712639476da5eeafba"
 dependencies = [
  "async-channel",
  "blocking",
@@ -13376,11 +13432,9 @@ dependencies = [
  "num-traits",
  "shaderloom",
  "tracing",
- "waterkit-audio",
- "waterui",
+ "waterkit-audio 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "waterui-core",
  "waterui-graphics",
- "waterui-testing",
  "wgpu",
 ]
 

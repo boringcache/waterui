@@ -3,10 +3,8 @@
 members = [
     "core",
     "components/assets/*",
-    "components/codes/*",
     "components/data/*",
     "components/devtools/*/*",
-    "components/effects/*",
     "components/foundation/*",
     "components/multimedia/*",
     "components/platform/*",
@@ -122,9 +120,10 @@ waterui-url = { version = "0.3.0", path = "utils/url" }
 waterui-watcher-set = { version = "0.1.0", path = "utils/watcher-set" }
 waterui-text = { version = "0.3.0", path = "components/foundation/text" }
 waterui-media = { version = "0.3.0", path = "components/multimedia/media" }
-waterui-image = { version = "0.3.0", path = "components/visual/image" }
+waterui-image = "0.3.0"
 waterui-video = { version = "0.3.0", path = "components/multimedia/video" }
-waterui-video-gpu = { version = "0.3.0", path = "components/multimedia/video_gpu" }
+waterui-video-gpu = "0.3.0"
+waterui-visualizer = "0.3.0"
 waterui-form = { version = "0.3.0", path = "components/foundation/form" }
 waterui-controls = { version = "0.3.0", path = "components/foundation/controls"}
 waterui-graphics = { version = "0.3.0", path = "components/visual/graphics", default-features = false }
@@ -176,10 +175,10 @@ waterui-backend-core = { version = "0.1.0", path = "backends/core", default-feat
 filtrate = "0.2.0"
 filtrate-core = "0.2.0"
 filtrate-derive = "0.1.0"
-waterui-barcode = { version = "0.1.0", path = "components/codes/barcode" }
-waterui-particle = { version = "0.1.0", path = "components/effects/particle" }
+waterui-barcode = "0.1.0"
+waterui-particle = "0.1.0"
 waterui-chart = "0.1.0"
-waterui-map-gpu = { version = "0.1.0", path = "components/data/map_gpu" }
+waterui-map-gpu = "0.1.0"
 waterui-assets = { version = "0.1.0", path = "components/assets/runtime" }
 waterui-assets-planner = { version = "0.1.0", path = "components/assets/planner" }
 waterui-assets-macros = { version = "0.1.0", path = "components/assets/macros" }
@@ -406,6 +405,10 @@ waterui-graphics = { path = "components/visual/graphics" }
 waterui-layout = { path = "components/foundation/layout" }
 waterui-shape = { path = "components/foundation/shape" }
 waterui-text = { path = "components/foundation/text" }
+waterui-map = { path = "components/data/map" }
+waterui-url = { path = "utils/url" }
+waterui-controls = { path = "components/foundation/controls" }
+waterui-video = { path = "components/multimedia/video" }
 xcb = { git = "https://github.com/rust-x-bindings/rust-xcb", rev = "ae3b2cd080e78173223038ccbebdc644eaf4a9ad" }
 # `block` 0.1.6 declares the Blocks ABI symbol as an uninhabited extern
 # static. This pinned fork changes only that declaration to the symbol's byte
@@ -416,6 +419,25 @@ block = { git = "https://github.com/Dicklesworthstone/rust-block", rev = "b39ae8
 # underflowed workgroup-array index; Mali page-faults on it). Fixed upstream in
 # linebender/vello#1817; drop this patch when a release containing it ships.
 vello = { git = "https://github.com/lexoliu/vello", rev = "5e5f538556be16527f67379b105af82f408b747d" }
+
+# vello_hybrid 0.2.0 keeps only one physical layer in its image atlas off wasm,
+# and wgpu's GL backend then makes that texture `TEXTURE_2D` while the shader
+# samples a `texture_2d_array`, so every image brush renders black on a GL
+# adapter (#366). It also clamps `Extend::Pad` to the last texel's leading
+# corner and only then subtracts the half texel that turns a corner into a
+# centre, so a bilinear image brush never reaches its final source row or
+# column (#234). This rev is the 0.2.0 release plus a two-layer floor decided
+# by the adapter backend and a pad that clamps to the texel centres. The other
+# two sparse-strip crates come from the same rev because `vello_hybrid` names
+# them by path there, and a second copy of `vello_common` would make its paint
+# types different types. Drop when a release carrying both fixes ships —
+# linebender/vello#1859 (one 2D texture per atlas) covers the first.
+vello_hybrid = { git = "https://github.com/lexoliu/vello", rev = "d68d9e9825bcd1ffee762323881c13a2e7a3f639" }
+vello_common = { git = "https://github.com/lexoliu/vello", rev = "d68d9e9825bcd1ffee762323881c13a2e7a3f639" }
+vello_sparse_shaders = { git = "https://github.com/lexoliu/vello", rev = "d68d9e9825bcd1ffee762323881c13a2e7a3f639" }
+# `vello_hybrid`'s text API takes glyphs from `glifo`, which that repo also
+# carries by path; the same rev keeps one `Glyph` type in the graph.
+glifo = { git = "https://github.com/lexoliu/vello", rev = "d68d9e9825bcd1ffee762323881c13a2e7a3f639" }
 
 # Arm's proprietary Vulkan driver (r54p2 on Pixel 9 Pro / Android 16)
 # rasterizes as if viewport heights were positive, ignoring the negative-height
