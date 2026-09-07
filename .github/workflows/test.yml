@@ -11,6 +11,11 @@ on:
       full:
         type: boolean
         default: false
+    secrets:
+      BORINGCACHE_RESTORE_TOKEN:
+        required: false
+      BORINGCACHE_SAVE_TOKEN:
+        required: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -161,7 +166,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      id-token: write
+    env:
+      BORINGCACHE_RESTORE_TOKEN: ${{ secrets.BORINGCACHE_RESTORE_TOKEN }}
+      BORINGCACHE_SAVE_TOKEN: ${{ github.event_name != 'pull_request' && secrets.BORINGCACHE_SAVE_TOKEN || '' }}
     timeout-minutes: 120
     strategy:
       # Report every platform in one run. Cancelling the other hides its
@@ -195,12 +202,12 @@ jobs:
       # One full-workspace pass under default features. Every crate's own
       # optional features are the `all-features` job below (Linux) and the
       # `macos-suites` all-features pass (macOS).
-      - run: mise exec -- boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ github.event_name == 'pull_request' && 'read-only' || 'write' }} nextest run --workspace --exclude '*-example' --profile ci
+      - run: mise exec -- boringcache cargo --${{ github.event_name == 'pull_request' && 'read-only' || 'write' }} nextest run --workspace --exclude '*-example' --profile ci
         env:
           MISE_CONFIG_FILE: ${{ runner.temp }}/boringcache-tools/mise.toml
       # nextest cannot run doctests, and this workspace has plenty of them.
       - if: runner.os == 'Linux'
-        run: mise exec -- boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ github.event_name == 'pull_request' && 'read-only' || 'write' }} --skip-restore test --doc --workspace --exclude '*-example'
+        run: mise exec -- boringcache cargo --${{ github.event_name == 'pull_request' && 'read-only' || 'write' }} --skip-restore test --doc --workspace --exclude '*-example'
         env:
           MISE_CONFIG_FILE: ${{ runner.temp }}/boringcache-tools/mise.toml
       - name: Upload Test Snapshots
