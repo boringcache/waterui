@@ -17,7 +17,7 @@ on:
   # Integration branches only: a branch that also has a PR would otherwise run
   # the whole gate twice for one commit.
   push:
-    branches: [main, dev]
+    branches: [main, dev, boringcache-validation]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
