@@ -22,8 +22,8 @@ runs:
         CLI_OVERRIDE: ${{ inputs.cli-version }}
       run: |
         mkdir -p "$RUNNER_TEMP/boringcache-tools"
-        # Use the reviewed One v1.20.2 release's default CLI.
-        gh api 'repos/boringcache/one/contents/action.yml?ref=c62af42c5c1e29388ceeea77b6a7f1db51f641e7' \
+        # Use the reviewed One v1.20.3 release's default CLI.
+        gh api 'repos/boringcache/one/contents/action.yml?ref=dd0c732a76a5c8d70090a259c1255823acaf85b8' \
           -H 'Accept: application/vnd.github.raw+json' > "$RUNNER_TEMP/boringcache-tools/action.yml"
         version=$(sed -n '/^  cli-version:/,/^  cli-platform:/s/^    default: '\''\([^'\'']*\)'\''/\1/p' "$RUNNER_TEMP/boringcache-tools/action.yml")
         if [ -n "$CLI_OVERRIDE" ]; then version="$CLI_OVERRIDE"; fi
@@ -31,6 +31,7 @@ runs:
         case "$RUNNER_OS" in
           Linux) asset=boringcache-linux-amd64 ;;
           macOS) asset=boringcache-macos-universal ;;
+          Windows) asset=boringcache-windows-amd64.exe ;;
           *) echo "Unsupported runner: $RUNNER_OS" >&2; exit 1 ;;
         esac
         printf '[tools]\n"github:boringcache/cli" = { version = "%s", asset_pattern = "%s", rename_exe = "boringcache" }\n' \
@@ -53,7 +54,10 @@ runs:
         mise trust "$MISE_CONFIG_FILE"
         mise install github:boringcache/cli
         mise exec -- boringcache --version
+        mise where github:boringcache/cli >> "$GITHUB_PATH"
         # Keep compiler fingerprints consistent between nextest and doctests.
         echo 'RUSTC_WRAPPER=sccache' >> "$GITHUB_ENV"
-        echo 'CC=sccache cc' >> "$GITHUB_ENV"
-        echo 'CXX=sccache c++' >> "$GITHUB_ENV"
+        if [ "$RUNNER_OS" != Windows ]; then
+          echo 'CC=sccache cc' >> "$GITHUB_ENV"
+          echo 'CXX=sccache c++' >> "$GITHUB_ENV"
+        fi

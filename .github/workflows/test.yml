@@ -14,7 +14,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # Workspace tests use BoringCache; other jobs retain rust-cache.
+  # BoringCache preserves compiler outputs and separate Cargo target profiles.
   CARGO_INCREMENTAL: 0
   WATERUI_TEST_ARTIFACTS_DIR: ${{ github.workspace }}/test-artifacts
 
@@ -34,6 +34,11 @@ env:
 # push to `dev` run the default-features gate on Linux. Nothing is checked
 # less often than daily, and nothing a pull request can break in the default
 # shape waits behind a shape it did not touch.
+
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   # Lint before testing: it is the cheapest failure to produce, and the one a
   # contributor is most likely to hit, so it should not wait behind the whole
@@ -53,23 +58,16 @@ jobs:
           components: clippy, rustfmt
       - name: Install native dependencies
         uses: ./.github/actions/setup-linux-deps
-      # The Linux `~/.cargo` tarball is written here and read by every other
-      # Linux job (see the cache budget note in ci.yml). Only the integration
-      # branches write it: a pull request reads and saves nothing, since every
-      # distinct fingerprint would otherwise mint a generation that is never
-      # reclaimed.
-      - uses: Swatinem/rust-cache@v2
+      - name: Install BoringCache
+        uses: ./.github/actions/setup-boringcache
         with:
-          shared-key: cargo-home-${{ runner.os }}
-          cache-targets: false
-          save-if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' }}
-          cache-on-failure: true
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       - name: Format
         run: cargo fmt --all -- --check
       # Workspace-wide under default features first: it is the cheapest of the
       # lint passes and the one every crate's normal build shape goes through.
       - name: Clippy (workspace)
-        run: cargo clippy --workspace --exclude '*-example' --all-targets -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-save clippy --workspace --exclude '*-example' --all-targets -- -D warnings
       # Then every crate's own optional features. This pass used to be
       # `cargo clippy --all-targets --all-features`, with neither `-p` nor
       # `--workspace`: the root manifest carries both `[workspace]` and
@@ -93,7 +91,7 @@ jobs:
       - name: Clippy (all features, workspace)
         if: inputs.full
         run: |
-          cargo clippy --workspace --all-targets --all-features \
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy --workspace --all-targets --all-features \
             --exclude '*-example' \
             --exclude waterui-core \
             --exclude waterui-ffi \
@@ -105,7 +103,7 @@ jobs:
       # crate has, it gets here.
       - name: Clippy (waterui-core, every stable feature)
         if: inputs.full
-        run: cargo clippy -p waterui-core --all-targets --features std,serde -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy -p waterui-core --all-targets --features std,serde -- -D warnings
       # `waterui-ffi` selects its ABI with mutually exclusive features and
       # `ffi/src/lib.rs` turns `c-api` + `android-jni` into a `compile_error!`.
       # This is the `c-api` half with every optional C surface a runtime build
@@ -113,7 +111,7 @@ jobs:
       # and the compile-only `cef-header` shape is the `macos-suites` job below.
       - name: Clippy (waterui-ffi, C ABI surfaces)
         if: inputs.full
-        run: cargo clippy -p waterui-ffi --all-targets --features map,chromium,webview-cef -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy -p waterui-ffi --all-targets --features map,chromium,webview-cef -- -D warnings
       # `webview-system` bridges the macOS WKWebView into the winit window and
       # `compile_error!`s anywhere else, so this is every hydrolysis feature but
       # that one. `macos-suites` compiles `webview-system` in its
@@ -121,7 +119,7 @@ jobs:
       - name: Clippy (hydrolysis, every portable feature)
         if: inputs.full
         run: |
-          cargo clippy -p hydrolysis --all-targets \
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy -p hydrolysis --all-targets \
             --features accessibility,inspector-signals,testing,web,winit -- -D warnings
       # `compile-only` swaps in CEF's `dox` stubs and stops the build script
       # downloading the distribution that `cef-runtime` — and the `real_engine`
@@ -132,7 +130,7 @@ jobs:
       # `--all-targets` skips it for want of its required feature.
       - name: Clippy (waterui-browser-cef, CEF runtime)
         if: inputs.full
-        run: cargo clippy -p waterui-browser-cef --all-targets --features chromium,webview -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy -p waterui-browser-cef --all-targets --features chromium,webview -- -D warnings
       # Dew's firmware shape, which is a first-class configuration rather than
       # a degraded one. Neither pass above compiles dew's test targets without
       # default features, and the `Features` job's `--each-feature` sweep runs
@@ -142,14 +140,14 @@ jobs:
       # library alone has always been clean here.
       - name: Clippy (dew firmware shape)
         if: inputs.full
-        run: cargo clippy -p waterui-dew --all-targets --no-default-features -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy -p waterui-dew --all-targets --no-default-features -- -D warnings
       # The waterui skill's snippet compile gate: every rust fence in
       # .claude/skills/waterui is transcribed into .claude/skills/waterui/skill_snippets
       # and must keep compiling. The non-default feature exposes the test/bench
       # transcriptions to the compiler without registering runnable tests —
       # they address elements that do not exist by design and must never run.
       - name: Skill snippet compile gate
-        run: cargo check -p skill_snippets --all-targets --features compile-gate-tests
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore check -p skill_snippets --all-targets --features compile-gate-tests
 
   # The workspace test run, per platform. On Linux it also carries the
   # doctests, which share its build; on macOS those go to `macos-suites`, so
@@ -195,14 +193,10 @@ jobs:
       # One full-workspace pass under default features. Every crate's own
       # optional features are the `all-features` job below (Linux) and the
       # `macos-suites` all-features pass (macOS).
-      - run: mise exec -- boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ github.event_name == 'pull_request' && 'read-only' || 'write' }} nextest run --workspace --exclude '*-example' --profile ci
-        env:
-          MISE_CONFIG_FILE: ${{ runner.temp }}/boringcache-tools/mise.toml
+      - run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile test ${{ runner.os == 'Linux' && '--skip-save' || '' }} nextest run --workspace --exclude '*-example' --profile ci
       # nextest cannot run doctests, and this workspace has plenty of them.
       - if: runner.os == 'Linux'
-        run: mise exec -- boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ github.event_name == 'pull_request' && 'read-only' || 'write' }} --skip-restore test --doc --workspace --exclude '*-example'
-        env:
-          MISE_CONFIG_FILE: ${{ runner.temp }}/boringcache-tools/mise.toml
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile test --skip-restore test --doc --workspace --exclude '*-example'
       - name: Upload Test Snapshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -257,18 +251,14 @@ jobs:
         uses: ./.github/actions/setup-linux-deps
         with:
           gpu: "true"
-      # Restore-only reader of the shared Linux `~/.cargo` tarball (see the
-      # cache budget note in ci.yml).
-      - uses: Swatinem/rust-cache@v2
+      - name: Install BoringCache
+        uses: ./.github/actions/setup-boringcache
         with:
-          shared-key: cargo-home-${{ runner.os }}
-          cache-targets: false
-          save-if: false
-          cache-on-failure: true
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       - uses: taiki-e/install-action@nextest
       - name: Test (all features, workspace)
         run: |
-          cargo nextest run --workspace --all-features --profile ci \
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile all-features --skip-save nextest run --workspace --all-features --profile ci \
             --exclude '*-example' \
             --exclude waterui-core \
             --exclude waterui-ffi \
@@ -278,25 +268,25 @@ jobs:
             --exclude skill_snippets
       # `nightly` is `feature(never_type)`, a hard E0554 on stable.
       - name: Test (waterui-core, every stable feature)
-        run: cargo nextest run -p waterui-core --features std,serde --profile ci
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile all-features --skip-restore --skip-save nextest run -p waterui-core --features std,serde --profile ci
       # The `c-api` half with every optional C surface a runtime build can
       # carry; `android-jni` is the `Android FFI` job in ci.yml.
       - name: Test (waterui-ffi, C ABI surfaces)
-        run: cargo nextest run -p waterui-ffi --features map,chromium,webview-cef --profile ci
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile all-features --skip-restore --skip-save nextest run -p waterui-ffi --features map,chromium,webview-cef --profile ci
       # Every hydrolysis feature but `webview-system`, which only builds on
       # macOS (`macos-suites` runs its `real_engine_macos` target).
       - name: Test (hydrolysis, every portable feature)
         run: |
-          cargo nextest run -p hydrolysis --profile ci \
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile all-features --skip-restore --skip-save nextest run -p hydrolysis --profile ci \
             --features accessibility,inspector-signals,testing,web,winit
       # The CEF runtime shape; `compile-only` and `real-engine` exclude it.
       - name: Test (waterui-browser-cef, CEF runtime)
-        run: cargo nextest run -p waterui-browser-cef --features chromium,webview --profile ci
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile all-features --skip-restore --skip-save nextest run -p waterui-browser-cef --features chromium,webview --profile ci
       # Dew's firmware shape, a first-class configuration whose test targets
       # had stopped compiling entirely before the clippy pass covered them
       # (#259); this is the run that goes with that lint.
       - name: Test (dew firmware shape)
-        run: cargo nextest run -p waterui-dew --no-default-features --profile ci
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile all-features --skip-restore nextest run -p waterui-dew --no-default-features --profile ci
       - name: Upload Test Snapshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -326,14 +316,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      # Writes the macOS `~/.cargo` tarball for the macOS jobs that store no
-      # target directory (see the cache budget note in ci.yml).
-      - uses: Swatinem/rust-cache@v2
+      - name: Install BoringCache
+        uses: ./.github/actions/setup-boringcache
         with:
-          shared-key: cargo-home-${{ runner.os }}
-          cache-targets: false
-          save-if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' }}
-          cache-on-failure: true
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       - uses: taiki-e/install-action@nextest
       # Every crate's own optional features, with the same exclusions as the
       # Linux `all-features` job (see there; `waterui-browser-wpe` is
@@ -343,7 +329,7 @@ jobs:
       # host-independent and the Linux job covers them.
       - name: Test (all features, workspace)
         run: |
-          cargo nextest run --workspace --all-features --profile ci \
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile macos-suites --skip-save nextest run --workspace --all-features --profile ci \
             --exclude '*-example' \
             --exclude waterui-core \
             --exclude waterui-ffi \
@@ -351,19 +337,19 @@ jobs:
             --exclude waterui-browser-cef \
             --exclude skill_snippets
       - name: Test (waterui-core, every stable feature)
-        run: cargo nextest run -p waterui-core --features std,serde --profile ci
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile macos-suites --skip-restore --skip-save nextest run -p waterui-core --features std,serde --profile ci
       - name: Test (hydrolysis, every portable feature)
         run: |
-          cargo nextest run -p hydrolysis --profile ci \
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile macos-suites --skip-restore --skip-save nextest run -p hydrolysis --profile ci \
             --features accessibility,inspector-signals,testing,web,winit
       # The macOS real-engine suite drives a genuine WKWebView through the
       # shared bridge contract — the macOS sibling of the WPE real-engine
       # workflow. It is `harness = false` (WKWebView is MainThreadOnly, and
       # libtest runs tests on worker threads), so nextest cannot list it;
       # `cargo test` runs the binary on the real process main thread.
-      - run: cargo test -p hydrolysis --features webview-system,winit --test real_engine_macos
+      - run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile macos-suites --skip-restore --skip-save test -p hydrolysis --features webview-system,winit --test real_engine_macos
       # nextest cannot run doctests, and this workspace has plenty of them.
-      - run: cargo test --doc --workspace --exclude '*-example'
+      - run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile macos-suites --skip-restore --skip-save test --doc --workspace --exclude '*-example'
       # The web view bridge has broken three times in ways no Rust-side test
       # could see, so these drive a real Chromium. Unlike the WPE sibling in
       # `browser-wpe.yml`, which compiles an engine from source for hours, CEF
@@ -386,13 +372,13 @@ jobs:
       # CEF runtime download, on a workspace this job has already built.
       - name: Lint the CEF targets
         run: |
-          cargo clippy -p waterui-browser-cef --features real-engine --all-targets -- -D warnings
-          cargo clippy -p waterui-ffi --features cef-header --all-targets -- -D warnings
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile macos-suites --skip-restore --skip-save clippy -p waterui-browser-cef --features real-engine --all-targets -- -D warnings
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile macos-suites --skip-restore --skip-save clippy -p waterui-ffi --features cef-header --all-targets -- -D warnings
       # `cargo test` rather than nextest: CEF's browser process has to own the
       # main thread, libtest runs test bodies on spawned ones, so the target is
       # `harness = false` and nextest cannot enumerate it.
       - name: Run the CEF real-engine tests
-        run: cargo test -p waterui-browser-cef --features real-engine --test real_engine
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile macos-suites --skip-restore test -p waterui-browser-cef --features real-engine --test real_engine
       - name: Upload Test Snapshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -430,18 +416,16 @@ jobs:
         uses: ./.github/actions/setup-linux-deps
         with:
           gpu: "true"
-      - uses: Swatinem/rust-cache@v2
+      - name: Install BoringCache
+        uses: ./.github/actions/setup-boringcache
         with:
-          shared-key: cargo-home-${{ runner.os }}
-          cache-targets: false
-          save-if: false
-          cache-on-failure: true
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       - uses: taiki-e/install-action@nextest
       - name: Clippy (examples)
         if: runner.os == 'Linux'
-        run: cargo clippy -p '*-example' --all-targets -- -D warnings
-      - run: cargo nextest run -p '*-example' --profile ci
-      - run: cargo test --doc -p '*-example'
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile examples --skip-save clippy -p '*-example' --all-targets -- -D warnings
+      - run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile examples ${{ runner.os == 'Linux' && '--skip-restore' || '' }} --skip-save nextest run -p '*-example' --profile ci
+      - run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile examples --skip-restore test --doc -p '*-example'
       - name: Upload Test Snapshots
         if: always()
         uses: actions/upload-artifact@v4

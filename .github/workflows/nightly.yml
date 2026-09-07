@@ -31,7 +31,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # rust-cache is the only cache layer (see the note in ci.yml).
+  # Disable incremental state in cached CI builds.
   CARGO_INCREMENTAL: 0
 
 jobs:
@@ -65,21 +65,10 @@ jobs:
         # backend those tests are baselined against.
         with:
           gpu: "true"
-      # Its own key: an instrumented build shares no artifacts with the
-      # ordinary ones, so storing it under the shared key would just overwrite
-      # a useful tarball with one nothing else can restore. The target dir is
-      # deliberately NOT cached: the instrumented tarball measures 3-5GB, and
-      # together with the two Test tarballs that oversubscribes the 10GB cache
-      # quota — every run would then evict one of the three and put a Test leg
-      # back on a 60-minute cold build. Coverage recompiles each run (~42min,
-      # which it already did when it was being evicted 4 runs out of 4) but
-      # only stores the ~0.2GB dependency caches, so the Test legs stay warm.
-      - uses: Swatinem/rust-cache@v2
+      - name: Install BoringCache
+        uses: ./.github/actions/setup-boringcache
         with:
-          shared-key: cargo-home-${{ runner.os }}
-          cache-targets: false
-          save-if: false
-          cache-on-failure: true
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: taiki-e/install-action@nextest
       - name: Prepare coverage target dir
@@ -90,7 +79,7 @@ jobs:
       # cargo's build profile. The ci profile matters here because it disables
       # fail-fast — without it a single failing test ends the run and hides the
       # state of every test after it (see #153, where one failure masked 632).
-      - run: cargo llvm-cov nextest --workspace --exclude '*-example' --features waterui/all --lcov --output-path lcov.info
+      - run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile coverage llvm-cov nextest --workspace --exclude '*-example' --features waterui/all --lcov --output-path lcov.info
         env:
           NEXTEST_PROFILE: ci
       - uses: codecov/codecov-action@v4
@@ -108,13 +97,10 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
       - uses: ./.github/actions/setup-linux-deps
-      # The single writer of `ci-ubuntu` (see Hygiene above).
-      - uses: Swatinem/rust-cache@v2
+      - name: Install BoringCache
+        uses: ./.github/actions/setup-boringcache
         with:
-          shared-key: cargo-home-${{ runner.os }}
-          cache-targets: false
-          save-if: false
-          cache-on-failure: true
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       - uses: taiki-e/install-action@cargo-hack
       # `--feature-powerset` is deliberately absent. The workspace has ~33_800
       # feature combinations (waterui alone has 14 features = 16_384), so the
@@ -122,7 +108,7 @@ jobs:
       # proved nothing — it produced no signal in any recent run. `--each-feature`
       # is linear and catches the failure that actually happens: a feature that
       # does not build on its own.
-      - run: cargo hack check --each-feature --no-dev-deps
+      - run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile feature-checks hack check --each-feature --no-dev-deps
 
   test-report:
     name: Test Report
@@ -146,7 +132,7 @@ jobs:
   report:
     name: Report failure
     needs: [test, windows, coverage, feature-checks]
-    if: failure()
+    if: failure() && github.repository == 'water-rs/waterui'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

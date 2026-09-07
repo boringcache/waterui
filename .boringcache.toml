@@ -1,8 +1,63 @@
 workspace = "boringcache/waterui"
 
+[entries.ffi-header-target]
+kind = "cargo-target"
+tag = "ffi-header-target"
+path = "target"
+
+[entries.android-ffi-target]
+kind = "cargo-target"
+tag = "android-ffi-target"
+path = "target"
+
+[entries.lint-target]
+kind = "cargo-target"
+tag = "lint-target"
+path = "target"
+
 [entries.test-target]
 kind = "cargo-target"
 tag = "test-target"
+path = "target"
+
+[entries.all-features-target]
+kind = "cargo-target"
+tag = "all-features-target"
+path = "target"
+
+[entries.macos-suites-target]
+kind = "cargo-target"
+tag = "macos-suites-target"
+path = "target"
+
+[entries.examples-target]
+kind = "cargo-target"
+tag = "examples-target"
+path = "target"
+
+[entries.coverage-target]
+kind = "cargo-target"
+tag = "coverage-target"
+path = "target"
+
+[entries.feature-checks-target]
+kind = "cargo-target"
+tag = "feature-checks-target"
+path = "target"
+
+[entries.windows-test-target]
+kind = "cargo-target"
+tag = "windows-test-target"
+path = "target"
+
+[entries.windows-features-target]
+kind = "cargo-target"
+tag = "windows-features-target"
+path = "target"
+
+[entries.windows-lint-target]
+kind = "cargo-target"
+tag = "windows-lint-target"
 path = "target"
 
 [entries.cargo-registry-cache]
@@ -14,13 +69,49 @@ tag = "cargo-registry-index"
 [entries.cargo-git-db]
 tag = "cargo-git-db"
 
+[profiles.dependencies]
+entries = ["cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.ffi-header]
+entries = ["ffi-header-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.android-ffi]
+entries = ["android-ffi-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.lint]
+entries = ["lint-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
 [profiles.test]
 entries = ["test-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
 
-[adapters.sccache]
-tag = "rust"
+[profiles.all-features]
+entries = ["all-features-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.macos-suites]
+entries = ["macos-suites-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.examples]
+entries = ["examples-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.coverage]
+entries = ["coverage-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.feature-checks]
+entries = ["feature-checks-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.windows-test]
+entries = ["windows-test-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.windows-features]
+entries = ["windows-features-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.windows-lint]
+entries = ["windows-lint-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
 
 [adapters.cargo]
 profiles = ["test"]
 compiler-cache = "sccache"
 fail-on-cache-error = true
+
+[adapters.sccache]
+tag = "rust"

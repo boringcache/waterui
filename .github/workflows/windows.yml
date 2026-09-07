@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: windows-${{ github.ref }}
@@ -20,7 +21,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # rust-cache is the only cache layer (see the note in ci.yml).
+  # Disable incremental state in cached CI builds.
   CARGO_INCREMENTAL: 0
   WATERUI_TEST_ARTIFACTS_DIR: ${{ github.workspace }}/test-artifacts
 
@@ -46,16 +47,10 @@ jobs:
         uses: tracel-ai/github-actions/install-dxc@295f2fdbae5271f4f8ad56d634e4ff6a95daafc8
       - name: Verify DirectX Shader Compiler
         run: dxc --version
-      - uses: Swatinem/rust-cache@v2
+      - name: Install BoringCache
+        uses: ./.github/actions/setup-boringcache
         with:
-          shared-key: test-windows-latest
-          # Only the integration branches write cache generations, as in
-          # ci.yml and test.yml: a pull request reads them and saves nothing.
-          # Every PR fingerprint used to mint its own 5 GB generation here,
-          # and with the 10 GB repository cap that evicted the Test tarballs
-          # a dev run had just written (#328).
-          save-if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' }}
-          cache-on-failure: true
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       - uses: taiki-e/install-action@nextest
       # Four crates cannot be tested here, for reasons that are not bugs:
       #
@@ -85,9 +80,9 @@ jobs:
       # `--all-features` pass is structurally impossible — `waterui-ffi`
       # enforces "exactly one ABI" with a `compile_error!` (ffi/src/lib.rs), so
       # enabling `c-api` and `android-jni` together can never build.
-      - run: cargo nextest run --workspace --exclude waterui-dylib --exclude waterui-browser-cef --exclude webview-cef-example --exclude chromium-example --profile ci
+      - run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile windows-test --skip-save nextest run --workspace --exclude waterui-dylib --exclude waterui-browser-cef --exclude webview-cef-example --exclude chromium-example --profile ci
       # nextest cannot run doctests, and this workspace has plenty of them.
-      - run: cargo test --doc --workspace --exclude waterui-dylib --exclude waterui-browser-cef --exclude webview-cef-example --exclude chromium-example
+      - run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile windows-test --skip-restore test --doc --workspace --exclude waterui-dylib --exclude waterui-browser-cef --exclude webview-cef-example --exclude chromium-example
       - name: Upload Test Snapshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -97,9 +92,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # Every crate's own optional features, in its own job so the test tarball
-  # above holds one feature variant of the dependency graph instead of two
-  # (#362): this job stores only `~/.cargo`, like macos-suites.
+  # Every crate's own optional features, in its own job and Cargo cache profile
+  # so the default-feature test target above remains separate (#362).
   #
   # Two passes, because the root crate cannot join a workspace-wide
   # `--all-features` here: that turns on `dynamic_linking`, which pulls in
@@ -128,18 +122,16 @@ jobs:
         uses: tracel-ai/github-actions/install-dxc@295f2fdbae5271f4f8ad56d634e4ff6a95daafc8
       - name: Verify DirectX Shader Compiler
         run: dxc --version
-      - uses: Swatinem/rust-cache@v2
+      - name: Install BoringCache
+        uses: ./.github/actions/setup-boringcache
         with:
-          shared-key: cargo-home-${{ runner.os }}
-          cache-targets: false
-          save-if: false
-          cache-on-failure: true
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       - uses: taiki-e/install-action@nextest
       - name: Test (root crate, every feature but dynamic_linking)
-        run: cargo nextest run --features all --profile ci
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile windows-features --skip-save nextest run --features all --profile ci
       - name: Test (all features, workspace)
         run: |
-          cargo nextest run --workspace --all-features --profile ci `
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile windows-features --skip-restore --skip-save nextest run --workspace --all-features --profile ci `
             --exclude waterui `
             --exclude waterui-dylib `
             --exclude '*-example' `
@@ -149,10 +141,10 @@ jobs:
             --exclude waterui-browser-cef `
             --exclude skill_snippets
       - name: Test (waterui-core, every stable feature)
-        run: cargo nextest run -p waterui-core --features std,serde --profile ci
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile windows-features --skip-restore --skip-save nextest run -p waterui-core --features std,serde --profile ci
       - name: Test (hydrolysis, every portable feature)
         run: |
-          cargo nextest run -p hydrolysis --profile ci `
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile windows-features --skip-restore nextest run -p hydrolysis --profile ci `
             --features accessibility,inspector-signals,testing,web,winit
       - name: Upload Test Snapshots
         if: always()
@@ -180,21 +172,15 @@ jobs:
         uses: tracel-ai/github-actions/install-dxc@295f2fdbae5271f4f8ad56d634e4ff6a95daafc8
       - name: Verify DirectX Shader Compiler
         run: dxc --version
-      # Writes the Windows `~/.cargo` tarball (see the cache budget note in
-      # ci.yml); the target directory belongs to the test job above. This
-      # block used to save a 2.2 GB target tarball on every pull request
-      # fingerprint, ungated.
-      - uses: Swatinem/rust-cache@v2
+      - name: Install BoringCache
+        uses: ./.github/actions/setup-boringcache
         with:
-          shared-key: cargo-home-${{ runner.os }}
-          cache-targets: false
-          save-if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' }}
-          cache-on-failure: true
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       # Compile the CEF backend without its binary distribution (see the test
       # job for why it cannot be linked here).
-      - run: cargo check -p waterui-browser-cef --features compile-only
+      - run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile windows-lint --skip-save check -p waterui-browser-cef --features compile-only
       # Windows-only code is invisible to every other leg: a `cfg(windows)` body
       # is compiled nowhere else, so a lint that fires only there reaches
       # nobody.
       - name: Clippy
-        run: cargo clippy --workspace --exclude waterui-dylib --exclude waterui-browser-cef --all-targets -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile windows-lint --skip-restore clippy --workspace --exclude waterui-dylib --exclude waterui-browser-cef --all-targets -- -D warnings

@@ -1,5 +1,7 @@
 .DS_Store
 target
+/test-artifacts/
+/lcov.info
 .water
 apple/DerivedData
 apple/build
