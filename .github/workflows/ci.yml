@@ -20,6 +20,12 @@ on:
     branches: [main, dev]
   pull_request:
     branches: ["**"]
+  workflow_dispatch:
+    inputs:
+      connect_cache:
+        description: Approve the one-time BoringCache CI connection
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -27,7 +33,8 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # rust-cache is the only cache layer here. GHA-backed sccache used to sit in
+  # Workspace tests use BoringCache; other jobs retain rust-cache below.
+  # GHA-backed sccache used to sit in
   # front of it and measured a 2-8% hit rate while holding 38% of the
   # repository's 10GB Actions cache quota, so its main effect was evicting the
   # rust-cache tarballs that do work and putting every job back on a cold
@@ -65,17 +72,22 @@ jobs:
   changes:
     name: Changes
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
     outputs:
       code: ${{ steps.prose.outputs.docs_only != 'true' || steps.filter.outputs.workflows == 'true' }}
-      ffi: ${{ steps.filter.outputs.ffi == 'true' || steps.filter.outputs.workflows == 'true' }}
-      deps: ${{ steps.filter.outputs.deps == 'true' || steps.filter.outputs.workflows == 'true' }}
+      ffi: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.ffi == 'true' || steps.filter.outputs.workflows == 'true' }}
+      deps: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.deps == 'true' || steps.filter.outputs.workflows == 'true' }}
     steps:
       - uses: actions/checkout@v4
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request'
         with:
           fetch-depth: 0
       - uses: dorny/paths-filter@v3
+        if: github.event_name != 'workflow_dispatch'
         id: filter
         with:
           base: ${{ github.ref_name }}
@@ -92,6 +104,7 @@ jobs:
               - ".github/workflows/**"
               - ".github/actions/**"
       - uses: dorny/paths-filter@v3
+        if: github.event_name != 'workflow_dispatch'
         id: prose
         with:
           base: ${{ github.ref_name }}
@@ -102,6 +115,18 @@ jobs:
               - "docs/**"
               - "LICENSE*"
               - ".github/ISSUE_TEMPLATE/**"
+
+      - name: Install BoringCache for CI connection
+        if: inputs.connect_cache == true
+        uses: ./.github/actions/setup-boringcache
+        with:
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
+
+      - name: Connect BoringCache
+        if: inputs.connect_cache == true
+        env:
+          MISE_CONFIG_FILE: ${{ runner.temp }}/boringcache-tools/mise.toml
+        run: mise exec -- boringcache ci connect --oidc-provider github-actions
 
   typos:
     name: Typos
@@ -308,6 +333,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+      checks: write
+      id-token: write
     with:
       full: false
 
@@ -327,4 +356,3 @@ jobs:
           path: artifacts/
       - name: Generate Step Summary
         run: python3 .github/scripts/generate_test_summary.py artifacts >> "$GITHUB_STEP_SUMMARY"
-

@@ -14,7 +14,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # rust-cache is the only cache layer (see the note in ci.yml).
+  # Workspace tests use BoringCache; other jobs retain rust-cache.
   CARGO_INCREMENTAL: 0
   WATERUI_TEST_ARTIFACTS_DIR: ${{ github.workspace }}/test-artifacts
 
@@ -159,6 +159,9 @@ jobs:
   test:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
     timeout-minutes: 120
     strategy:
       # Report every platform in one run. Cancelling the other hides its
@@ -184,24 +187,22 @@ jobs:
         uses: ./.github/actions/setup-linux-deps
         with:
           gpu: "true"
-      # macOS keeps its target directory (one of the two target tarballs the
-      # cache budget in ci.yml affords); the Linux leg reads the shared Linux
-      # `~/.cargo` tarball and compiles from there. Linux runners are the
-      # plentiful ones, and its cold build is shorter than the Windows one.
-      - uses: Swatinem/rust-cache@v2
+      - name: Install BoringCache
+        uses: ./.github/actions/setup-boringcache
         with:
-          shared-key: ${{ runner.os == 'macOS' && 'test-macos-latest' || format('cargo-home-{0}', runner.os) }}
-          cache-targets: ${{ runner.os == 'macOS' }}
-          save-if: ${{ runner.os == 'macOS' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main') }}
-          cache-on-failure: true
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       - uses: taiki-e/install-action@nextest
       # One full-workspace pass under default features. Every crate's own
       # optional features are the `all-features` job below (Linux) and the
       # `macos-suites` all-features pass (macOS).
-      - run: cargo nextest run --workspace --exclude '*-example' --profile ci
+      - run: mise exec -- boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ github.event_name == 'pull_request' && 'read-only' || 'write' }} nextest run --workspace --exclude '*-example' --profile ci
+        env:
+          MISE_CONFIG_FILE: ${{ runner.temp }}/boringcache-tools/mise.toml
       # nextest cannot run doctests, and this workspace has plenty of them.
       - if: runner.os == 'Linux'
-        run: cargo test --doc --workspace --exclude '*-example'
+        run: mise exec -- boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ github.event_name == 'pull_request' && 'read-only' || 'write' }} --skip-restore test --doc --workspace --exclude '*-example'
+        env:
+          MISE_CONFIG_FILE: ${{ runner.temp }}/boringcache-tools/mise.toml
       - name: Upload Test Snapshots
         if: always()
         uses: actions/upload-artifact@v4

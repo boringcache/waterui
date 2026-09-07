@@ -1,0 +1,59 @@
+name: Install BoringCache
+description: Install the reviewed BoringCache CLI and its Cargo compiler cache.
+
+inputs:
+  cli-version:
+    description: Optional exact BoringCache CLI release
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install sccache
+      uses: taiki-e/install-action@c44f6b046f1c29ae5918b1e0bfdbb2f1813836fd # v2.84.1
+      with:
+        tool: sccache@0.17.0
+
+    - name: Resolve BoringCache release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        CLI_OVERRIDE: ${{ inputs.cli-version }}
+      run: |
+        mkdir -p "$RUNNER_TEMP/boringcache-tools"
+        # Use the reviewed One v1.20.2 release's default CLI.
+        gh api 'repos/boringcache/one/contents/action.yml?ref=c62af42c5c1e29388ceeea77b6a7f1db51f641e7' \
+          -H 'Accept: application/vnd.github.raw+json' > "$RUNNER_TEMP/boringcache-tools/action.yml"
+        version=$(sed -n '/^  cli-version:/,/^  cli-platform:/s/^    default: '\''\([^'\'']*\)'\''/\1/p' "$RUNNER_TEMP/boringcache-tools/action.yml")
+        if [ -n "$CLI_OVERRIDE" ]; then version="$CLI_OVERRIDE"; fi
+        [[ "$version" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([-+][a-zA-Z0-9.-]+)?$ ]]
+        case "$RUNNER_OS" in
+          Linux) asset=boringcache-linux-amd64 ;;
+          macOS) asset=boringcache-macos-universal ;;
+          *) echo "Unsupported runner: $RUNNER_OS" >&2; exit 1 ;;
+        esac
+        printf '[tools]\n"github:boringcache/cli" = { version = "%s", asset_pattern = "%s", rename_exe = "boringcache" }\n' \
+          "$version" "$asset" > "$RUNNER_TEMP/boringcache-tools/mise.toml"
+
+    - name: Install mise
+      uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db
+      with:
+        version: 2026.9.1
+        install: false
+        cache: false
+        env: false
+
+    - name: Install BoringCache
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        MISE_CONFIG_FILE: ${{ runner.temp }}/boringcache-tools/mise.toml
+      run: |
+        mise trust "$MISE_CONFIG_FILE"
+        mise install github:boringcache/cli
+        mise exec -- boringcache --version
+        # Keep compiler fingerprints consistent between nextest and doctests.
+        echo 'RUSTC_WRAPPER=sccache' >> "$GITHUB_ENV"
+        echo 'CC=sccache cc' >> "$GITHUB_ENV"
+        echo 'CXX=sccache c++' >> "$GITHUB_ENV"
