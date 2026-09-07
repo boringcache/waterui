@@ -73,10 +73,6 @@ jobs:
           cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: taiki-e/install-action@nextest
-      - name: Prepare coverage target dir
-        run: |
-          mkdir -p target/llvm-cov-target
-          printf 'Signature: 8a477f597d28d172789f06886806bc55\n' > target/llvm-cov-target/CACHEDIR.TAG
       # NEXTEST_PROFILE rather than --profile: cargo-llvm-cov reads that flag as
       # cargo's build profile. The ci profile matters here because it disables
       # fail-fast — without it a single failing test ends the run and hides the
