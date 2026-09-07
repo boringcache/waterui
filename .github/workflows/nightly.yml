@@ -9,6 +9,8 @@ name: Nightly
 # current instead of failing a run nobody is watching.
 
 on:
+  push:
+    branches: [boringcache-validation]
   # Off-peak UTC, staggered against the bench (05:41) and dependency (Mon
   # 09:00) schedules so the runs do not compete for the org's job cap.
   schedule:

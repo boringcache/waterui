@@ -67,7 +67,7 @@ jobs:
       # Workspace-wide under default features first: it is the cheapest of the
       # lint passes and the one every crate's normal build shape goes through.
       - name: Clippy (workspace)
-        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-save clippy --workspace --exclude '*-example' --all-targets -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile ${{ inputs.full && 'lint-full' || 'lint' }} --skip-save clippy --workspace --exclude '*-example' --all-targets -- -D warnings
       # Then every crate's own optional features. This pass used to be
       # `cargo clippy --all-targets --all-features`, with neither `-p` nor
       # `--workspace`: the root manifest carries both `[workspace]` and
@@ -91,7 +91,7 @@ jobs:
       - name: Clippy (all features, workspace)
         if: inputs.full
         run: |
-          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy --workspace --all-targets --all-features \
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile ${{ inputs.full && 'lint-full' || 'lint' }} --skip-restore --skip-save clippy --workspace --all-targets --all-features \
             --exclude '*-example' \
             --exclude waterui-core \
             --exclude waterui-ffi \
@@ -103,7 +103,7 @@ jobs:
       # crate has, it gets here.
       - name: Clippy (waterui-core, every stable feature)
         if: inputs.full
-        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy -p waterui-core --all-targets --features std,serde -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile ${{ inputs.full && 'lint-full' || 'lint' }} --skip-restore --skip-save clippy -p waterui-core --all-targets --features std,serde -- -D warnings
       # `waterui-ffi` selects its ABI with mutually exclusive features and
       # `ffi/src/lib.rs` turns `c-api` + `android-jni` into a `compile_error!`.
       # This is the `c-api` half with every optional C surface a runtime build
@@ -111,7 +111,7 @@ jobs:
       # and the compile-only `cef-header` shape is the `macos-suites` job below.
       - name: Clippy (waterui-ffi, C ABI surfaces)
         if: inputs.full
-        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy -p waterui-ffi --all-targets --features map,chromium,webview-cef -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile ${{ inputs.full && 'lint-full' || 'lint' }} --skip-restore --skip-save clippy -p waterui-ffi --all-targets --features map,chromium,webview-cef -- -D warnings
       # `webview-system` bridges the macOS WKWebView into the winit window and
       # `compile_error!`s anywhere else, so this is every hydrolysis feature but
       # that one. `macos-suites` compiles `webview-system` in its
@@ -119,7 +119,7 @@ jobs:
       - name: Clippy (hydrolysis, every portable feature)
         if: inputs.full
         run: |
-          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy -p hydrolysis --all-targets \
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile ${{ inputs.full && 'lint-full' || 'lint' }} --skip-restore --skip-save clippy -p hydrolysis --all-targets \
             --features accessibility,inspector-signals,testing,web,winit -- -D warnings
       # `compile-only` swaps in CEF's `dox` stubs and stops the build script
       # downloading the distribution that `cef-runtime` — and the `real_engine`
@@ -130,7 +130,7 @@ jobs:
       # `--all-targets` skips it for want of its required feature.
       - name: Clippy (waterui-browser-cef, CEF runtime)
         if: inputs.full
-        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy -p waterui-browser-cef --all-targets --features chromium,webview -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile ${{ inputs.full && 'lint-full' || 'lint' }} --skip-restore --skip-save clippy -p waterui-browser-cef --all-targets --features chromium,webview -- -D warnings
       # Dew's firmware shape, which is a first-class configuration rather than
       # a degraded one. Neither pass above compiles dew's test targets without
       # default features, and the `Features` job's `--each-feature` sweep runs
@@ -140,14 +140,14 @@ jobs:
       # library alone has always been clean here.
       - name: Clippy (dew firmware shape)
         if: inputs.full
-        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore --skip-save clippy -p waterui-dew --all-targets --no-default-features -- -D warnings
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile ${{ inputs.full && 'lint-full' || 'lint' }} --skip-restore --skip-save clippy -p waterui-dew --all-targets --no-default-features -- -D warnings
       # The waterui skill's snippet compile gate: every rust fence in
       # .claude/skills/waterui is transcribed into .claude/skills/waterui/skill_snippets
       # and must keep compiling. The non-default feature exposes the test/bench
       # transcriptions to the compiler without registering runnable tests —
       # they address elements that do not exist by design and must never run.
       - name: Skill snippet compile gate
-        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile lint --skip-restore check -p skill_snippets --all-targets --features compile-gate-tests
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile ${{ inputs.full && 'lint-full' || 'lint' }} --skip-restore check -p skill_snippets --all-targets --features compile-gate-tests
 
   # The workspace test run, per platform. On Linux it also carries the
   # doctests, which share its build; on macOS those go to `macos-suites`, so
