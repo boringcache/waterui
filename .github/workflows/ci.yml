@@ -21,6 +21,11 @@ on:
   pull_request:
     branches: ["**"]
   workflow_dispatch:
+    inputs:
+      connect_cache:
+        description: Approve the one-time BoringCache CI connection
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -67,7 +72,11 @@ jobs:
   changes:
     name: Changes
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
     outputs:
       code: ${{ steps.prose.outputs.docs_only != 'true' || steps.filter.outputs.workflows == 'true' }}
       ffi: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.ffi == 'true' || steps.filter.outputs.workflows == 'true' }}
@@ -106,6 +115,18 @@ jobs:
               - "docs/**"
               - "LICENSE*"
               - ".github/ISSUE_TEMPLATE/**"
+
+      - name: Install BoringCache for CI connection
+        if: inputs.connect_cache == true
+        uses: ./.github/actions/setup-boringcache
+        with:
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
+
+      - name: Connect BoringCache
+        if: inputs.connect_cache == true
+        env:
+          MISE_CONFIG_FILE: ${{ runner.temp }}/boringcache-tools/mise.toml
+        run: mise exec -- boringcache ci connect --oidc-provider github-actions
 
   typos:
     name: Typos
@@ -312,9 +333,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/test.yml
-    secrets:
-      BORINGCACHE_RESTORE_TOKEN: ${{ secrets.BORINGCACHE_RESTORE_TOKEN }}
-      BORINGCACHE_SAVE_TOKEN: ${{ secrets.BORINGCACHE_SAVE_TOKEN }}
+    permissions:
+      contents: read
+      checks: write
+      id-token: write
     with:
       full: false
 
