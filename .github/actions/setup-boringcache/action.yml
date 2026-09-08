@@ -22,8 +22,8 @@ runs:
         CLI_OVERRIDE: ${{ inputs.cli-version }}
       run: |
         mkdir -p "$RUNNER_TEMP/boringcache-tools"
-        # Use the reviewed One v1.20.3 release's default CLI.
-        gh api 'repos/boringcache/one/contents/action.yml?ref=dd0c732a76a5c8d70090a259c1255823acaf85b8' \
+        # Use the reviewed One v1.20.4 release's default CLI.
+        gh api 'repos/boringcache/one/contents/action.yml?ref=e4ead12dabc993eba201c402a82e396166dade03' \
           -H 'Accept: application/vnd.github.raw+json' > "$RUNNER_TEMP/boringcache-tools/action.yml"
         version=$(sed -n '/^  cli-version:/,/^  cli-platform:/s/^    default: '\''\([^'\'']*\)'\''/\1/p' "$RUNNER_TEMP/boringcache-tools/action.yml")
         if [ -n "$CLI_OVERRIDE" ]; then version="$CLI_OVERRIDE"; fi
