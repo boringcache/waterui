@@ -13,6 +13,7 @@ use merman_render::family::{self, LayoutProjection};
 use merman_render::model::{LayoutEdge, LayoutLabel, LayoutNode};
 use waterui_core::layout::{Point, Rect, Size};
 use waterui_str::Str;
+use waterui_text::FontCollection;
 
 use crate::layout::{
     Cluster, DiagramLayout, Edge, EdgeMarker, EdgeStroke, Emphasis, Fragment, Label, Lifeline,
@@ -63,12 +64,16 @@ const DEFAULT_FONT_SIZE: f32 = 16.0;
 /// size regardless; this is the value Mermaid itself defaults to.
 const LAYOUT_CONTAINER: Size = Size::new(800.0, 600.0);
 
-/// Parses and lays out one diagram.
+/// Parses and lays out one diagram, measured against `fonts`.
+///
+/// The collection is the application's own — the one the host installed and
+/// every other component shapes with — so the boxes this reserves are the boxes
+/// the label views will be painted into.
 ///
 /// # Errors
 ///
 /// See [`MermaidError`].
-pub fn render(source: &str) -> Result<DiagramLayout, MermaidError> {
+pub fn render(source: &str, fonts: FontCollection) -> Result<DiagramLayout, MermaidError> {
     let container = LAYOUT_CONTAINER;
     let engine = Engine::new();
     let parsed = engine
@@ -78,10 +83,11 @@ pub fn render(source: &str) -> Result<DiagramLayout, MermaidError> {
 
     let family = Str::from(parsed.metadata().diagram_type.clone());
     let font_size = configured_font_size(parsed.metadata());
+    let diagram_padding = configured_diagram_padding(parsed.metadata());
     let semantic = parsed.model().clone();
 
     let session = RenderEnvironment::deterministic()
-        .with_text_measurement_policy(measure::policy())
+        .with_text_measurement_policy(measure::policy(fonts))
         .begin_session()
         .map_err(MermaidError::Session)?;
 
@@ -96,7 +102,7 @@ pub fn render(source: &str) -> Result<DiagramLayout, MermaidError> {
             let merman_core::RenderSemanticModel::Flowchart(model) = &semantic else {
                 unreachable!("a flowchart layout is only produced from a flowchart model")
             };
-            flowchart(model, geometry, font_size)
+            flowchart(model, geometry, font_size, diagram_padding)
         }
         LayoutProjection::SequenceDiagram(geometry) => {
             let merman_core::RenderSemanticModel::Sequence(model) = &semantic else {
@@ -114,10 +120,12 @@ fn flowchart(
     model: &merman_core::diagrams::flowchart::FlowchartModel,
     geometry: &merman_render::model::FlowchartLayout,
     font_size: f32,
+    diagram_padding: f64,
 ) -> Result<DiagramLayout, MermaidError> {
     use merman_core::diagrams::flowchart::{FlowEdgeStroke, FlowEdgeVisibility};
 
-    let origin = Origin::of(geometry.bounds.as_ref());
+    let canvas = Canvas::of(geometry.bounds.as_ref(), diagram_padding);
+    let origin = canvas.origin;
 
     let mut nodes = Vec::with_capacity(geometry.nodes.len());
     for laid_out in &geometry.nodes {
@@ -194,7 +202,7 @@ fn flowchart(
         .collect();
 
     Ok(DiagramLayout {
-        size: bounds_size(geometry.bounds.as_ref()),
+        size: canvas.size,
         clusters,
         fragments: Vec::new(),
         nodes,
@@ -211,6 +219,23 @@ fn flowchart(
 /// `fontSize` is Mermaid's own documented configuration knob, and it is what
 /// `merman` derives the `TextStyle` it measures with from. Reading it here is
 /// what lets a label be drawn at the size its box was measured at.
+fn configured_diagram_padding(metadata: &merman_core::ParseMetadata) -> f64 {
+    /// Mermaid's default for `flowchart.diagramPadding`.
+    const DEFAULT: f64 = 8.0;
+    /// The inset a one-unit stroke on the boundary needs to stay inside.
+    const MINIMUM_PAINT_INSET: f64 = 1.0;
+
+    metadata
+        .effective_config
+        .as_value()
+        .get("flowchart")
+        .and_then(|flowchart| flowchart.get("diagramPadding"))
+        .and_then(serde_json::Value::as_f64)
+        .filter(|padding| padding.is_finite())
+        .unwrap_or(DEFAULT)
+        .max(MINIMUM_PAINT_INSET)
+}
+
 fn configured_font_size(metadata: &merman_core::ParseMetadata) -> f32 {
     metadata
         .effective_config
@@ -229,6 +254,37 @@ fn configured_font_size(metadata: &merman_core::ParseMetadata) -> f32 {
         .unwrap_or(DEFAULT_FONT_SIZE)
 }
 
+/// The canvas one diagram is drawn on.
+///
+/// The origin and the size are decided together because they answer the same
+/// question — where the diagram's coordinate space starts, and how much room it
+/// needs — and an inset applied to one but not the other silently crops the
+/// diagram.
+#[derive(Debug, Clone, Copy, Default)]
+struct Canvas {
+    origin: Origin,
+    size: Size,
+}
+
+impl Canvas {
+    /// The canvas holding `bounds` with `inset` units of room on every side.
+    fn of(bounds: Option<&merman_render::model::Bounds>, inset: f64) -> Self {
+        bounds.map_or_else(Self::default, |bounds| {
+            let origin = Origin {
+                x: bounds.min_x - inset,
+                y: bounds.min_y - inset,
+            };
+            Self {
+                origin,
+                size: size_of(
+                    bounds.max_x + inset - origin.x,
+                    bounds.max_y + inset - origin.y,
+                ),
+            }
+        })
+    }
+}
+
 /// Where a diagram's own coordinate space starts.
 ///
 /// Mermaid lays a diagram out wherever its algorithm happens to begin, not at
@@ -242,14 +298,6 @@ struct Origin {
 }
 
 impl Origin {
-    /// Reads the diagram's origin off its bounds.
-    fn of(bounds: Option<&merman_render::model::Bounds>) -> Self {
-        bounds.map_or(Self { x: 0.0, y: 0.0 }, |bounds| Self {
-            x: bounds.min_x,
-            y: bounds.min_y,
-        })
-    }
-
     #[expect(
         clippy::cast_possible_truncation,
         reason = "diagram coordinates are screen-scale magnitudes that f32 represents exactly enough to draw"
@@ -295,13 +343,6 @@ fn edge_label(edge: &LayoutEdge, text: Option<&str>, origin: Origin) -> Option<L
         frame: origin.label(frame),
         text: Str::from(text.to_string()),
         emphasis: Emphasis::Normal,
-    })
-}
-
-/// The diagram's natural size.
-fn bounds_size(bounds: Option<&merman_render::model::Bounds>) -> Size {
-    bounds.map_or_else(Size::default, |bounds| {
-        size_of(bounds.max_x - bounds.min_x, bounds.max_y - bounds.min_y)
     })
 }
 
@@ -372,7 +413,11 @@ fn sequence(
     geometry: &merman_render::model::SequenceDiagramLayout,
     font_size: f32,
 ) -> Result<DiagramLayout, MermaidError> {
-    let origin = Origin::of(geometry.bounds.as_ref());
+    // A sequence diagram carries its own margin: `diagramMarginX` /
+    // `diagramMarginY` are already outside the outermost participant by the
+    // time bounds exist, which is why they start at `(-50, -10)`.
+    let canvas = Canvas::of(geometry.bounds.as_ref(), 0.0);
+    let origin = canvas.origin;
 
     let mut nodes = Vec::with_capacity(geometry.nodes.len());
     for laid_out in &geometry.nodes {
@@ -390,7 +435,7 @@ fn sequence(
     }
 
     Ok(DiagramLayout {
-        size: bounds_size(geometry.bounds.as_ref()),
+        size: canvas.size,
         clusters: participant_boxes(model, geometry, origin),
         fragments: fragments(model, geometry, origin, &lifelines),
         nodes,
@@ -687,5 +732,162 @@ fn lifeline_span(lifelines: &[Lifeline], actors: &[String]) -> (f32, f32) {
         (left, right)
     } else {
         (0.0, 0.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use waterui_core::Environment;
+    use waterui_text::FontCollection;
+
+    use super::{Rect, Size, render};
+    use crate::measure;
+
+    const FLOWCHART: &str = "\
+flowchart TD
+    A[Start] --> B{Ready?}
+    B -->|yes| C([Go])
+    B -->|no| D[(Wait)]
+    subgraph Ingest
+        C --> E[Parse the incoming document]
+    end
+";
+
+    const SEQUENCE: &str = "\
+sequenceDiagram
+    participant Reader
+    participant Renderer
+    Reader->>Renderer: parse(source)
+    Renderer-->>Reader: layout
+";
+
+    /// A flowchart's canvas is bigger than the geometry on it.
+    ///
+    /// Dagre's bounds are the diagram's content, exactly: the first node's top
+    /// edge is at `min_y` and a diamond's left vertex is at `min_x`. Drawing
+    /// that content on a canvas of exactly those bounds puts half of every
+    /// outermost stroke outside the picture — the diamond in `FLOWCHART` came
+    /// out with its left vertex sliced off, and a subgraph frame lost its top
+    /// rule. The assertion is a strict inequality on every side, because
+    /// touching the edge is the defect.
+    #[test]
+    fn a_flowchart_keeps_room_around_its_outermost_geometry() {
+        let diagram = render(FLOWCHART, FontCollection::system()).expect("the diagram lays out");
+        let width = diagram.size.width;
+        let height = diagram.size.height;
+        assert!(
+            width > 0.0 && height > 0.0,
+            "the diagram must have a canvas for this to assert anything"
+        );
+
+        let mut checked = 0_usize;
+        let mut inside = |what: &str, frame: Rect| {
+            checked += 1;
+            let origin = frame.origin();
+            let size = frame.size();
+            assert!(
+                origin.x > 0.0
+                    && origin.y > 0.0
+                    && origin.x + size.width < width
+                    && origin.y + size.height < height,
+                "{what} {frame:?} touches the edge of the {width}x{height} canvas"
+            );
+        };
+
+        for cluster in &diagram.clusters {
+            inside("a subgraph frame", cluster.frame);
+        }
+        for node in &diagram.nodes {
+            inside("a node box", node.frame);
+        }
+        for edge in &diagram.edges {
+            for point in &edge.points {
+                inside("an edge point", Rect::new(*point, Size::default()));
+            }
+        }
+        assert!(
+            checked > 0,
+            "the diagram must have geometry for this to assert anything"
+        );
+    }
+
+    /// A diagram's boxes and its glyphs come from one font collection, so every
+    /// box is big enough for the text that will be painted into it. This is the
+    /// whole reason the crate supplies a measurer instead of accepting
+    /// `merman`'s browser-compatibility profile, and it fails the moment the two
+    /// halves stop reading the same faces.
+    #[test]
+    fn every_reserved_box_holds_the_text_it_will_be_painted_with() {
+        let fonts = FontCollection::system();
+        for source in [FLOWCHART, SEQUENCE] {
+            let diagram = render(source, fonts.clone()).expect("the diagram lays out");
+            assert!(
+                diagram.labels().next().is_some(),
+                "the diagram must have labels for this to assert anything"
+            );
+            for label in diagram.labels() {
+                let painted = measure::measure(
+                    fonts.clone(),
+                    &label.text,
+                    &measure::label_style(diagram.font_size),
+                );
+                assert!(
+                    f64::from(label.frame.size().width) >= painted.width
+                        && f64::from(label.frame.size().height) >= painted.height,
+                    "the box reserved for `{}` is {:?}, too small for the {}x{} the same \
+                     collection shapes it to",
+                    label.text,
+                    label.frame.size(),
+                    painted.width,
+                    painted.height
+                );
+            }
+        }
+    }
+
+    /// Two diagrams in one application measure through one collection — the one
+    /// the host installed — rather than each enumerating the system's fonts for
+    /// itself. Identity is the assertion, because two collections holding the
+    /// same faces would pass every metric comparison.
+    #[test]
+    fn two_diagrams_in_one_app_share_one_collection() {
+        let mut env = Environment::new();
+        FontCollection::system().install(&mut env);
+
+        let first = FontCollection::from_env(&env);
+        let second = FontCollection::from_env(&env);
+        assert_eq!(
+            first.identity(),
+            second.identity(),
+            "every diagram must measure through the one collection the host installed"
+        );
+
+        let one = render(FLOWCHART, first).expect("the first diagram lays out");
+        let other = render(FLOWCHART, second).expect("the second diagram lays out");
+        assert_eq!(one.size, other.size);
+    }
+
+    /// The collection is consulted, not decoration: a diagram measured against a
+    /// collection with no faces at all does not lay out to the same geometry as
+    /// one measured against the system's. Without this, the test above would
+    /// pass against a measurer that ignored its collection entirely.
+    #[test]
+    fn the_installed_collection_is_what_measures() {
+        let faceless = FontCollection::new(parley::FontContext {
+            collection: parley::fontique::Collection::new(parley::fontique::CollectionOptions {
+                system_fonts: false,
+                ..parley::fontique::CollectionOptions::default()
+            }),
+            source_cache: parley::fontique::SourceCache::default(),
+        });
+
+        let system = render(FLOWCHART, FontCollection::system()).expect("the diagram lays out");
+        let empty = render(FLOWCHART, faceless).expect("the diagram lays out");
+
+        assert_ne!(
+            system.size, empty.size,
+            "a diagram measured against no faces must not size like one measured \
+             against the system's"
+        );
     }
 }

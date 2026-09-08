@@ -91,10 +91,10 @@ executor-core = { version = "0.7.1", features = ["std"]}
 # off. (waterkit keeps it: its streaming code does `block_on`.)
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 futures-lite = "2.6"
-geo = { version = "0.32", default-features = false }
-getrandom = "0.2"
+geo = { version = "0.33", default-features = false }
+getrandom = "0.4"
 geo-types = "0.7"
-lru = "0.16"
+lru = "0.18"
 maplibre-expr = "0.3.2"
 mvt-reader = "2.4.0"
 # W3C UI Events key/code/modifier vocabulary, shared by the GPU-surface input
@@ -127,7 +127,13 @@ waterui-visualizer = "0.3.0"
 waterui-form = { version = "0.3.0", path = "components/foundation/form" }
 waterui-controls = { version = "0.3.0", path = "components/foundation/controls"}
 waterui-graphics = { version = "0.3.0", path = "components/visual/graphics", default-features = false }
-waterui-canvas = "0.1.0"
+# `waterui-canvas` 0.1.0 predates the `Path::arc_to` fix (#228): the standalone
+# repository forked from this one before it landed, so the published crate still
+# rounds a corner with the deflection angle, the wrong bisector, and the arc's
+# own `MoveTo` spliced into the contour. Every rounded outline and every routed
+# edge it draws comes apart (#418, #419). Pinned to the restored implementation
+# in water-rs/canvas#5; drop this once a release carrying it ships.
+waterui-canvas = { git = "https://github.com/water-rs/canvas", rev = "ed4cecc706f69f381555f3fe193134da6e0ff7fe" }
 waterui-mermaid = { version = "0.1.0", path = "components/data/mermaid" }
 # Mermaid parsing, semantic model and diagram layout. Consumed from our fork
 # while `typed-layout-projection` is unreleased upstream: `merman-render`'s only
@@ -219,10 +225,10 @@ parley = { version = "0.11", default-features = false }
 # SVG documents are parsed here and drawn through `Scene2D`; nothing in the
 # workspace renders one with `vello_svg`, so the parser is depended on directly
 # rather than through a Vello-only renderer.
-usvg = "0.46.0"
+usvg = "0.48.1"
 kurbo = "0.13"
 peniko = "0.6"
-skrifa = "0.42.1"
+skrifa = "0.46.2"
 # The only crate in the Rust ecosystem that reads the OpenType `MATH` table.
 # `read-fonts`/`skrifa` do not expose it (googlefonts/fontations#1269 has been
 # open since 2024-11), and neither `rustybuzz` nor `harfrust` port HarfBuzz's
@@ -236,13 +242,23 @@ pulldown-latex = "0.8"
 # Writes the MathML an accessibility tree carries. XML is structured output, so
 # it goes through a writer that escapes and balances tags rather than through
 # `push_str`/`format!` chains.
-quick-xml = "0.41"
+quick-xml = "0.42"
+# Turns that MathML into the sentence a screen reader reads out — the ClearSpeak
+# / MathSpeak engine assistive-technology vendors ship. `include-zip` compiles
+# the speech rules into the binary as one bzip2 archive served from an in-memory
+# filesystem, so the rules are not files anything has to install, bundle, or
+# find at runtime; without it MathCAT looks for a `Rules` directory on disk.
+mathcat = { version = "0.7.5", features = ["include-zip"] }
 toml = "1.1.3"
 vello_cpu = { version = "0.0.9", default-features = false }
 lyon = "1.0"
 wgpu-hal = { version = "29.0.4", features = ["gles", "metal"] }
 # Must match the `glow` version wgpu-hal links against, or GLES handles from
 # `wgpu::hal::gles` fail to unify with locally created ones.
+# Tracks whatever `wgpu-hal` links, not the newest release: the GTK backend
+# hands a `glow::NativeFramebuffer` straight to
+# `wgpu::hal::gles::TextureInner::ExternalNativeFramebuffer`, so a different
+# major here makes that a different type and the backend stops compiling.
 glow = "0.17"
 tiny-skia = "0.12"
 zenwave = { version = "0.5.0", default-features = false, features = ["hyper-backend"] }
@@ -283,6 +299,9 @@ waterui-dylib = { workspace = true, optional = true }
 [dev-dependencies]
 waterui-testing = { path = "testing" }
 hydrolysis-m3 = { path = "backends/hydrolysis_m3" }
+# Writes the test portrait the avatar visual acceptance renders. PNG only:
+# the encoder is all these tests need.
+image = { version = "0.25.10", default-features = false, features = ["png"] }
 
 [features]
 default = [
@@ -324,6 +343,11 @@ navigation-restoration = [
     "waterui-dylib?/navigation-restoration",
 ]
 flow-markdown = ["waterui-internal/flow-markdown", "waterui-dylib?/flow-markdown"]
+# Mathematical formulas in Markdown. Deliberately outside `all`: it brings a
+# layout engine, an OpenType `MATH` table reader, a LaTeX parser and MathCAT's
+# speech rules — about 2.7 MiB — and a bundled math font for the asset pipeline,
+# and `all` is what every full-feature CI leg builds on every platform.
+markdown-math = ["waterui-internal/markdown-math", "waterui-dylib?/markdown-math"]
 std = ["waterui-internal/std", "waterui-dylib?/std"]
 dynamic_linking = ["dep:waterui-dylib"]
 # Every feature the framework offers an application. `dynamic_linking` is
@@ -400,6 +424,11 @@ lto = "thin"
 # those to its own copies or the graph carries two of each and every `View`
 # is a different type on either side. Publishing ignores this table, so the
 # published crates keep their registry pins.
+# `waterui-chart` on crates.io depends on the registry `waterui-canvas`, which
+# predates the `Path::arc_to` fix the workspace pins by git rev (#228). Without
+# this entry the graph carries both copies and every canvas `Path` is a
+# different type on either side.
+waterui-canvas = { git = "https://github.com/water-rs/canvas", rev = "ed4cecc706f69f381555f3fe193134da6e0ff7fe" }
 waterui-core = { path = "core" }
 waterui-graphics = { path = "components/visual/graphics" }
 waterui-layout = { path = "components/foundation/layout" }
@@ -438,14 +467,3 @@ vello_sparse_shaders = { git = "https://github.com/lexoliu/vello", rev = "d68d9e
 # `vello_hybrid`'s text API takes glyphs from `glifo`, which that repo also
 # carries by path; the same rev keeps one `Glyph` type in the graph.
 glifo = { git = "https://github.com/lexoliu/vello", rev = "d68d9e9825bcd1ffee762323881c13a2e7a3f639" }
-
-# Arm's proprietary Vulkan driver (r54p2 on Pixel 9 Pro / Android 16)
-# rasterizes as if viewport heights were positive, ignoring the negative-height
-# viewport wgpu uses to flip Y, so every render pass comes out upside down.
-# This branch flips Y in the vertex shader on that driver instead; drop the
-# patch when upstream ships an equivalent workaround.
-wgpu = { git = "https://github.com/lexoliu/wgpu", branch = "mali-negative-viewport" }
-wgpu-core = { git = "https://github.com/lexoliu/wgpu", branch = "mali-negative-viewport" }
-wgpu-hal = { git = "https://github.com/lexoliu/wgpu", branch = "mali-negative-viewport" }
-wgpu-types = { git = "https://github.com/lexoliu/wgpu", branch = "mali-negative-viewport" }
-naga = { git = "https://github.com/lexoliu/wgpu", branch = "mali-negative-viewport" }

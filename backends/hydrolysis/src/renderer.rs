@@ -78,7 +78,7 @@ use accesskit::{
     ActionRequest as AccessibilityActionRequest, Node as AccessibilityNode,
     NodeId as AccessibilityNodeId, Rect as AccessibilityRect, Role as AccessibilityNodeRole,
     TextDirection as AccessibilityTextDirection, Toggled as AccessibilityToggled,
-    Tree as AccessibilityTree, TreeId as AccessibilityTreeId,
+    TreeId as AccessibilityTreeId, TreeInfo as AccessibilityTree,
     TreeUpdate as AccessibilityTreeUpdate,
 };
 use executor_core::spawn_local;
@@ -349,6 +349,13 @@ impl HydrolysisRenderer {
 
     /// As [`Self::new`], with the window renderer's Vello options spelled out.
     #[must_use]
+    #[cfg_attr(
+        target_arch = "wasm32",
+        expect(
+            clippy::arc_with_non_send_sync,
+            reason = "`SharedSceneRenderer` and `WgslModuleCache` own wgpu handles, which the WebGPU backend makes neither `Send` nor `Sync` because they are JS objects. The renderer is shared by reference count on every target and is `Send + Sync` on all of them but this one, so the storage type is `Arc` everywhere rather than `Rc` here and `Arc` elsewhere."
+        )
+    )]
     pub fn new_with_options(
         adapter: &wgpu::Adapter,
         device: &wgpu::Device,

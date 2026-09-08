@@ -20,6 +20,16 @@ kind = "cargo-target"
 tag = "lint-full-target"
 path = "target"
 
+[entries.wasm-target]
+kind = "cargo-target"
+tag = "wasm-target"
+path = "target"
+
+[entries.wasm-kit-target]
+kind = "cargo-target"
+tag = "wasm-kit-target"
+path = "kit/target"
+
 [entries.test-target]
 kind = "cargo-target"
 tag = "test-target"
@@ -88,6 +98,12 @@ entries = ["lint-target", "cargo-registry-cache", "cargo-registry-index", "cargo
 
 [profiles.lint-full]
 entries = ["lint-full-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.wasm]
+entries = ["wasm-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
+
+[profiles.wasm-kit]
+entries = ["wasm-kit-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]
 
 [profiles.test]
 entries = ["test-target", "cargo-registry-cache", "cargo-registry-index", "cargo-git-db"]

@@ -9,7 +9,7 @@ pub mod component;
 mod interaction_support;
 pub use interaction_support::{cursor, drag_drop, gesture, interaction};
 mod runtime;
-#[cfg(feature = "inspector")]
+#[cfg(all(feature = "inspector", not(target_arch = "wasm32")))]
 pub use runtime::inspector;
 #[cfg(feature = "snackbar")]
 pub use runtime::snackbar;
@@ -92,7 +92,9 @@ pub mod prelude {
     // Drag and drop extension traits
     pub use super::drag_drop::DropDestinationExt;
 
-    pub use super::widget::{Card, CardStyle, CardStyleTokens, CardTheme, Divider, card, suspense};
+    pub use super::widget::{
+        Avatar, Card, CardStyle, CardStyleTokens, CardTheme, Divider, avatar, card, suspense,
+    };
     #[cfg(feature = "flow-markdown")]
     pub use super::widget::{
         FlowAnimationPolicy, FlowAnimationPreset, FlowElementKind, FlowMarkdown, FlowStreamMode,

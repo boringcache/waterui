@@ -149,6 +149,64 @@ jobs:
       - name: Skill snippet compile gate
         run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile ${{ inputs.full && 'lint-full' || 'lint' }} --skip-restore check -p skill_snippets --all-targets --features compile-gate-tests
 
+  # The web runner, compiled for the target it actually runs on.
+  #
+  # Every other leg builds `hydrolysis --features web` for the host, where the
+  # runner and everything else under `cfg(target_arch = "wasm32")` is compiled
+  # out — so the browser build rotted through three unrelated breakages before
+  # anyone pointed a compiler at it (#408). This is the cheapest statement that
+  # it still builds: a clippy pass over the web runner plus the two crates whose
+  # wasm-only paths it reaches (`waterui-media` reads local photos through the
+  # kit file system there, and the kit dialog has a whole browser backend).
+  #
+  # It lints rather than merely compiles, so `cfg(target_arch = "wasm32")` code
+  # is held to the same bar as every other target (#413).
+  #
+  # It runs in both tiers rather than only in the nightly: a pull request
+  # touching any of those three can break it, and the check is a couple of
+  # minutes even cold, against the 90-120 minute legs beside it.
+  wasm:
+    name: wasm32
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # Cargo caps lints for registry dependencies, so this holds the workspace
+      # crates — and only them — to the same "no new warnings" bar as the host
+      # lint pass. It reaches further than the trailing `-- -D warnings` below,
+      # which only covers the packages named with `-p`.
+      RUSTFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      # Build scripts and proc macros still compile for the host even when
+      # every library target is wasm, and this graph reaches the ones that need
+      # native headers.
+      - name: Install native dependencies
+        uses: ./.github/actions/setup-linux-deps
+      - name: BoringCache Cargo
+        uses: ./.github/actions/setup-boringcache
+        with:
+          cli-version: ${{ vars.BORINGCACHE_CLI_VERSION }}
+      - name: Lint the web runner for wasm32
+        run: |
+          boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile wasm clippy --target wasm32-unknown-unknown \
+            -p hydrolysis --features hydrolysis/web \
+            -p waterui-media \
+            -p waterkit-dialog \
+            -- -D warnings
+      # `kit` is its own Cargo workspace, excluded from the root one, so the
+      # step above builds `waterkit-dialog` as a plain path dependency: cargo
+      # only points clippy-driver at members of the workspace it was invoked
+      # from, and the dialog's browser backend would go unlinted there however
+      # the flags are spelled. Lint it from the workspace that owns it.
+      - name: Lint the kit dialog browser backend for wasm32
+        working-directory: kit
+        run: boringcache ci run --oidc-provider github-actions -- boringcache cargo --${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && 'write' || 'read-only' }} --profile wasm-kit clippy -p waterkit-dialog --target wasm32-unknown-unknown -- -D warnings
+
   # The workspace test run, per platform. On Linux it also carries the
   # doctests, which share its build; on macOS those go to `macos-suites`, so
   # that this job is the workspace run alone — the single longest step in CI —
